@@ -1,27 +1,24 @@
-// models/User.ts — REPLACE your existing file with this
-
+// models/User.ts
 import mongoose, { Document, Model } from 'mongoose';
 
 export interface IUser extends Document {
   email: string;
   name: string;
   image?: string;
-  password?: string;
 
   // Free tier tracking
-  freeTriesUsed: number;          // Counts toward the 4 free total (1 anon + 3 logged in)
-  anonymousTriesUsed: number;     // Tracked via cookie before login
+  freeTriesUsed: number;
 
   // Subscription
   subscriptionStatus: 'free' | 'paid' | 'lifetime';
   subscriptionExpiry?: Date;
   razorpayPaymentId?: string;
+  razorpayOrderId?: string;
 
-  // Skill system
+  // Skill system (harder to level up)
   skillPoints: number;
-  skillLevel: string;
   analysisCount: number;
-  totalScore: number;
+  practiceMessageCount: number;
 
   // Timestamps
   createdAt: Date;
@@ -30,30 +27,22 @@ export interface IUser extends Document {
 
 const UserSchema = new mongoose.Schema<IUser>(
   {
-    email: { type: String, required: true, unique: true, lowercase: true },
-    name: { type: String, required: true },
-    image: { type: String },
-    password: { type: String },
+    email:  { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name:   { type: String, required: true },
+    image:  { type: String },
 
-    freeTriesUsed: { type: Number, default: 0 },
-    anonymousTriesUsed: { type: Number, default: 0 },
+    freeTriesUsed:    { type: Number, default: 0 },
 
-    subscriptionStatus: {
-      type: String,
-      default: 'free',
-      enum: ['free', 'paid', 'lifetime'],
-    },
+    subscriptionStatus: { type: String, default: 'free', enum: ['free', 'paid', 'lifetime'] },
     subscriptionExpiry: { type: Date },
-    razorpayPaymentId: { type: String },
+    razorpayPaymentId:  { type: String },
+    razorpayOrderId:    { type: String },
 
-    skillPoints: { type: Number, default: 0 },
-    skillLevel: {
-      type: String,
-      default: 'Dry Texter',
-      enum: ['Dry Texter', 'Average Talker', 'Smooth Conversationalist', 'Elite Charmer'],
-    },
-    analysisCount: { type: Number, default: 0 },
-    totalScore: { type: Number, default: 0 },
+    // Skill points - max 30/analysis, max 5/practice message
+    // Level thresholds: Dry Texter 0 | Average 200 | Smooth 600 | Elite 1500
+    skillPoints:          { type: Number, default: 0 },
+    analysisCount:        { type: Number, default: 0 },
+    practiceMessageCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

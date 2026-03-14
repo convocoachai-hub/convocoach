@@ -1,107 +1,154 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { Twitter, Github, Linkedin, Mail } from 'lucide-react';
-import logoImg from '@/app/logo.png'; // Using your custom logo
+import Image from 'next/image';
+import logoImg from '@/app/logo.png'; // Assuming you want your custom logo here too
+
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+const C = {
+  cream:   '#F3EDE2',
+  ink:     '#0F0C09',
+  red:     '#D13920',
+  warm1:   '#E8E0D2',
+  warm2:   '#D4CBBA',
+  muted:   '#8A8074',
+  mutedLt: '#BFB8AC',
+};
 
 const FOOTER_LINKS = {
   Product: [
-    { label: 'Analyze Chat', href: '/upload' },
+    { label: 'Analyze Chat',  href: '/upload'   },
     { label: 'Practice Mode', href: '/practice' },
-    { label: 'Examples', href: '/examples' },
-    { label: 'Pricing', href: '/upgrade' },
+    { label: 'Examples',      href: '/examples' },
+    { label: 'Pricing',       href: '/upgrade'  },
   ],
   Resources: [
-    { label: 'Dating Psychology', href: '#' },
-    { label: 'Texting Guides', href: '#' },
+    { label: 'Dating Psychology',  href: '#' },
+    { label: 'Texting Guides',     href: '#' },
     { label: 'Attraction Signals', href: '#' },
-    { label: 'Help Center', href: '#' },
+    { label: 'Help Center',        href: '#' },
   ],
   Company: [
-    { label: 'About Us', href: '#' },
-    { label: 'Contact', href: '#' },
+    { label: 'About Us',       href: '#' },
+    { label: 'Contact',        href: '#' },
     { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms of Service', href: '#' },
+    { label: 'Terms',          href: '#' },
   ],
 };
 
-export default function Footer() {
-  return (
-    <footer className="relative bg-[#050505] border-t border-white/5 pt-16 md:pt-24 pb-10 px-6 font-sans overflow-hidden">
-      
-      {/* Subtle top edge glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-violet-500/5 blur-[100px] rounded-full pointer-events-none" />
+const SOCIAL = [
+  { icon: Twitter,  href: '#', label: 'Twitter'  },
+  { icon: Github,   href: '#', label: 'GitHub'   },
+  { icon: Linkedin, href: '#', label: 'LinkedIn' },
+  { icon: Mail,     href: '#', label: 'Email'    },
+];
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        
-        {/* Top Section: Brand & Links */}
-        <div className="flex flex-col lg:flex-row gap-16 lg:gap-12 mb-16">
-          
-          {/* Brand Column */}
-          <div className="lg:w-2/5 flex flex-col gap-6">
-            <Link href="/" className="flex items-center gap-2.5 w-fit group">
+export default function Footer() {
+  const pathname = usePathname();
+  // Hide footer on full-screen app experiences
+  if (pathname === '/practice' || pathname === '/upload') return null;
+
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="w-full overflow-hidden" style={{ background: C.ink, borderTop: `1px solid rgba(243,237,226,0.07)`, fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── LINKS + BRAND GRID ────────────────────────────────────── */}
+      <div style={{ borderBottom: `1px solid rgba(243,237,226,0.07)` }}>
+        {/* 🔥 FIXED: Tailwind Grid classes handle the responsive layout perfectly without hydration errors */}
+        <div className="max-w-[1120px] mx-auto py-14 px-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 lg:gap-16">
+
+          {/* Brand blurb */}
+          <div className="flex flex-col">
+            <Link href="/" className="flex items-center mb-5" style={{ textDecoration: 'none' }}>
               <Image 
                 src={logoImg} 
                 alt="ConvoCoach Logo" 
-                width={32} 
+                width={140} 
                 height={32} 
-                className="object-contain transition-transform group-hover:scale-105"
+                className="h-7 w-auto object-contain brightness-0 invert" // Inverts dark logo to white for dark footer
               />
-              <span className="font-semibold tracking-tight text-white text-xl">
-                ConvoCoach
-              </span>
             </Link>
-            <p className="text-[14px] text-zinc-400 leading-relaxed max-w-sm">
-              Stop guessing if they like you. Advanced AI conversation intelligence to detect attraction, fix dry texts, and stop you from being left on read.
+
+            <p style={{ fontSize: 13.5, color: `${C.cream}40`, lineHeight: 1.75, maxWidth: 260, marginBottom: 24 }}>
+              AI conversation intelligence for dating, work, friendships, and everything in between.
             </p>
-            
-            {/* Social Icons */}
-            <div className="flex items-center gap-3 mt-2">
-              {[Twitter, Github, Linkedin, Mail].map((Icon, i) => (
-                <a 
-                  key={i} 
-                  href="#" 
-                  className="w-10 h-10 rounded-full bg-white/[0.02] border border-white/5 flex items-center justify-center text-zinc-400 hover:bg-white/10 hover:text-white hover:border-white/10 transition-all"
-                >
-                  <Icon className="w-[18px] h-[18px]" />
-                </a>
+
+            {/* Socials */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 20 }}>
+              {SOCIAL.map(({ icon: Icon, href, label }) => (
+                <motion.a key={label} href={href} aria-label={label}
+                  whileHover={{ y: -2, background: `${C.cream}12` }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: `${C.cream}06`, border: `1px solid rgba(243,237,226,0.1)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    textDecoration: 'none', transition: 'background 0.2s',
+                  }}>
+                  <Icon style={{ width: 16, height: 16, color: `${C.cream}45` }} />
+                </motion.a>
               ))}
             </div>
           </div>
 
-          {/* Link Columns (2 cols on mobile, 3 cols on desktop) */}
-          <div className="lg:w-3/5 grid grid-cols-2 md:grid-cols-3 gap-10 md:gap-8">
-            {Object.entries(FOOTER_LINKS).map(([title, links]) => (
-              <div key={title} className="flex flex-col gap-5">
-                <h4 className="text-white font-medium text-[15px] tracking-tight">{title}</h4>
-                <ul className="flex flex-col gap-3.5">
-                  {links.map((link) => (
-                    <li key={link.label}>
-                      <Link 
-                        href={link.href} 
-                        className="text-[14px] text-zinc-500 hover:text-zinc-200 transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          {/* Link columns */}
+          {Object.entries(FOOTER_LINKS).map(([title, links]) => (
+            <div key={title} className="flex flex-col">
+              <h4 style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'monospace', color: `${C.cream}30`, marginBottom: 20 }}>
+                {title}
+              </h4>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 14, padding: 0, margin: 0 }}>
+                {links.map(({ label, href }) => (
+                  <li key={label}>
+                    <Link href={href} style={{ textDecoration: 'none' }}>
+                      <motion.span
+                        whileHover={{ x: 3, color: C.cream }}
+                        style={{
+                          display: 'inline-block', fontSize: 14, color: `${C.cream}50`,
+                          fontWeight: 500, transition: 'color 0.2s', fontFamily: "'DM Sans', sans-serif",
+                        }}>
+                        {label}
+                      </motion.span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Bottom Section: Copyright & Divider */}
-        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
-          <p className="text-[13px] text-zinc-600 font-medium">
-            © {new Date().getFullYear()} ConvoCoach. All rights reserved.
-          </p>
-          <div className="flex items-center gap-2 text-[13px] text-zinc-600 font-medium">
-            <span>Built for people who want to be impossible to ignore.</span>
-          </div>
+      {/* ── BOTTOM BAR ────────────────────────────────────────────── */}
+      <div className="max-w-[1120px] mx-auto py-6 px-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <p style={{ fontSize: 12, color: `${C.cream}22`, margin: 0 }}>
+          © {year} ConvoCoach. All rights reserved.
+        </p>
+
+        {/* Red decorative line + tagline */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 24, height: 2, background: C.red, borderRadius: 2 }} />
+          <span style={{ fontSize: 12, color: `${C.cream}22`, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+            Built for people who refuse to be ignored.
+          </span>
         </div>
-        
+      </div>
+
+      {/* ── LARGE WATERMARK TEXT ──────────────────────────────────── */}
+      <div style={{ overflow: 'hidden', pointerEvents: 'none', userSelect: 'none', paddingBottom: 0 }}>
+        <div style={{
+          fontFamily: "'Bricolage Grotesque', sans-serif",
+          fontSize: 'clamp(60px, 14vw, 180px)', // Slightly reduced minimum size so it fits on small phones
+          fontWeight: 900, letterSpacing: '-0.06em',
+          color: `${C.cream}04`,
+          lineHeight: 0.85,
+          paddingLeft: 20,
+          whiteSpace: 'nowrap',
+        }}>
+          ConvoCoach
+        </div>
       </div>
     </footer>
   );

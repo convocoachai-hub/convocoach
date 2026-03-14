@@ -1,90 +1,217 @@
 // app/api/analyze/route.ts
-// Deep 10-layer conversation analysis — screenshot (vision) or plain text
-
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
 import connectToDatabase from '@/lib/mongodb';
 import ChatAnalysis from '@/models/ChatAnalysis';
+import User from '@/models/User';
+import { cookies } from 'next/headers';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ─── Context descriptors ───────────────────────────────────────────────────────
+const ANON_COOKIE = 'cc_a1';
+const FREE_MAX    = 3;
+
+// ─── CRITICAL: Sanitize control characters inside JSON strings ────────────────
+// The AI sometimes returns JSON with literal newlines/tabs inside string values
+// which makes JSON.parse throw "Bad control character in string literal".
+// This walks the string char-by-char and escapes control chars only inside strings.
+function sanitizeJSON(str: string): string {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    const code = str.charCodeAt(i);
+
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\' && inString) {
+      escaped = true;
+      result += ch;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+
+    if (inString && code < 0x20) {
+      switch (code) {
+        case 0x08: result += '\\b'; break;
+        case 0x09: result += '\\t'; break;
+        case 0x0A: result += '\\n'; break;
+        case 0x0C: result += '\\f'; break;
+        case 0x0D: result += '\\r'; break;
+        default:   result += `\\u${code.toString(16).padStart(4, '0')}`; break;
+      }
+      continue;
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
+// ─── Robust JSON extraction + parse ──────────────────────────────────────────
+function parseAIResponse(raw: string): Record<string, unknown> | null {
+  // 1. Strip markdown code fences
+  let cleaned = raw
+    .replace(/^```(?:json)?\s*/im, '')
+    .replace(/\s*```\s*$/m, '')
+    .trim();
+
+  // 2. Extract the outermost JSON object
+  const start = cleaned.indexOf('{');
+  const end   = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+
+  let jsonStr = cleaned.slice(start, end + 1);
+
+  // 3. Sanitize control characters inside string values
+  jsonStr = sanitizeJSON(jsonStr);
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch (firstErr) {
+    // 4. Last resort: strip remaining control chars outside strings
+    try {
+      const fallback = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      return JSON.parse(fallback);
+    } catch {
+      console.error('[Analyze] JSON parse failed. First error:', firstErr);
+      console.error('[Analyze] Raw snippet:', raw.slice(0, 600));
+      return null;
+    }
+  }
+}
+
+// ─── Context descriptors ──────────────────────────────────────────────────────
 const CONTEXT_PROMPTS: Record<string, string> = {
-  dating:        'Romantic / dating conversation. Analyze for attraction, flirting quality, romantic momentum, and connection-building.',
-  situationship: 'Situationship / undefined talking stage. Analyze for mixed signals, ambiguity, push-pull dynamics, emotional availability.',
-  office:        'Professional / workplace. Analyze communication clarity, tone, assertiveness, and professional impact. Ignore romantic signals.',
-  friendship:    'Friendship dynamic. Analyze warmth, reciprocity, support quality, and whether the dynamic is balanced or one-sided.',
+  dating:        'Romantic / dating conversation. Analyze for attraction, flirting quality, romantic momentum, connection-building, and chemistry.',
+  situationship: 'Situationship / undefined talking stage. Analyze mixed signals, ambiguity, push-pull dynamics, emotional availability.',
+  office:        'Professional / workplace communication. Analyze clarity, tone, assertiveness, professional impact. Do NOT apply romantic framing.',
+  friendship:    'Friendship dynamic. Analyze warmth, reciprocity, support quality, and whether the dynamic is balanced.',
   networking:    'Professional networking. Analyze value proposition, tone, clarity of ask, and rapport-building quality.',
   family:        'Family conversation. Analyze emotional warmth, care communication, and tension handling.',
   reconnecting:  'Reconnecting after a gap. Analyze re-engagement strategy, natural vs forced warmth, and rapport rebuilding.',
 };
 
-// ─── Language hints ────────────────────────────────────────────────────────────
 const LANGUAGE_HINTS: Record<string, string> = {
-  auto: 'Auto-detect language from the text. Analyze in that language context; return all analysis keys in English.',
+  auto: 'Auto-detect from the conversation text. Analyze in that language context. Keep all JSON keys in English.',
   en:   'English.',
-  hi:   'Hindi / Hinglish. Indian chats mix Hindi, English, and transliterated Hindi freely — read all of it.',
+  hi:   'Hindi / Hinglish — mixed Hindi + English transliteration is normal.',
   es:   'Spanish.',
   fr:   'French.',
-  pt:   'Portuguese (Brazilian or European).',
-  ar:   'Arabic (RTL). Note cultural communication norms carefully.',
-  ja:   'Japanese. Keigo vs casual registers matter — note what register is being used.',
-  ko:   'Korean. Honorific levels signal relationship closeness.',
+  pt:   'Portuguese.',
+  ar:   'Arabic.',
+  ja:   'Japanese — note keigo vs casual register.',
+  ko:   'Korean — note honorific levels.',
   de:   'German.',
   tr:   'Turkish.',
   ru:   'Russian.',
   it:   'Italian.',
-  zh:   'Chinese (Simplified or Traditional).',
-  id:   'Indonesian / Bahasa.',
+  zh:   'Chinese.',
+  id:   'Indonesian.',
 };
 
-// ─── The 10-layer deep analysis prompt ────────────────────────────────────────
-function buildAnalysisPrompt(context: string, language: string, roastMode: boolean): string {
-  const ctxNote  = CONTEXT_PROMPTS[context] ?? CONTEXT_PROMPTS.dating;
-  const langNote = LANGUAGE_HINTS[language] ?? LANGUAGE_HINTS.auto;
+// ─── Speaker side hint ────────────────────────────────────────────────────────
+function speakerHint(side: string): string {
+  if (side === 'right') return `
+SPEAKER IDENTIFICATION — USER CONFIRMED:
+The person who wants this analysis has confirmed their messages are on the RIGHT side (blue/filled bubbles).
+- RIGHT side bubbles = USER (label as "User" in extractedText)
+- LEFT side bubbles  = THE OTHER PERSON (label as "Them" in extractedText)
+This is 100% confirmed. Do NOT mix them up.`;
 
-  return `You are an expert conversation analyst, dating psychologist, and behavioral communication coach. You are producing a deep, premium-quality report that delivers real psychological insight — not a surface-level summary.
+  if (side === 'left') return `
+SPEAKER IDENTIFICATION — USER CONFIRMED:
+The person who wants this analysis has confirmed their messages are on the LEFT side.
+- LEFT side bubbles  = USER (label as "User" in extractedText)
+- RIGHT side bubbles = THE OTHER PERSON (label as "Them" in extractedText)
+This is 100% confirmed. Do NOT mix them up.`;
+
+  return `
+SPEAKER IDENTIFICATION — AUTO-DETECT:
+Determine who is the "User" vs "Them" from visual cues:
+- Blue/filled/right-aligned bubbles are almost always the User in WhatsApp, iMessage, Instagram, Tinder
+- "Delivered" / "Read" / checkmarks appear under the User's own messages
+- The other person's name/avatar appears at the top of the screen or next to their bubbles
+Make a definitive call and record it in "whoIsUser".`;
+}
+
+// ─── Build prompt ─────────────────────────────────────────────────────────────
+function buildPrompt(context: string, language: string, roastMode: boolean, userSide: string): string {
+  const ctxNote  = CONTEXT_PROMPTS[context]  ?? CONTEXT_PROMPTS.dating;
+  const langNote = LANGUAGE_HINTS[language]  ?? LANGUAGE_HINTS.auto;
+  const sideNote = speakerHint(userSide);
+
+  return `You are an expert conversation analyst, dating psychologist, and behavioral communication coach. Produce a deep, premium-quality 10-layer analysis with genuine psychological insight.
 
 LANGUAGE: ${langNote}
 CONTEXT: ${ctxNote}
-${roastMode ? 'ROAST MODE: Be brutally honest and darkly funny. Reference specific messages. End with one real tip.' : ''}
+${roastMode ? 'ROAST MODE ENABLED: Be brutally honest and darkly funny. Reference specific real messages. End with one real actionable tip despite the roast.' : ''}
 
-READING INSTRUCTIONS (for screenshots):
-- Identify which side is the USER (right/blue bubbles) and which is THE OTHER PERSON (left/grey)
-- Read every single message carefully. Do not skip any.
-- Note reply speed if timestamps are visible
-- Note message length ratios — they signal investment
+${sideNote}
 
-Produce a detailed JSON report covering all 10 layers below.
-Return ONLY valid JSON — no markdown, no backticks, no explanation outside the JSON.
+━━━ WHAT TO COMPLETELY IGNORE ━━━
+Never analyze or quote any of these UI elements — they are noise:
+• Timestamps and date separators (e.g. "Today 2:34 PM", "Yesterday", "Monday")
+• Read receipts and delivery status ("Delivered", "Seen", "✓✓", "Read")
+• App notification banners
+• Status bar content (signal bars, battery, clock)
+• Profile pictures, avatars, contact names at screen top
+• "typing..." or "online" indicators
+• Reaction emoji overlays on messages
+• Message status icons (single/double ticks)
+• App navigation chrome (back buttons, menu icons, etc.)
+
+━━━ EXTRACT ONLY ━━━
+• The actual text content from message bubbles
+• Who sent each message (User vs Them)
+
+━━━ IMPORTANT JSON RULES ━━━
+- Return ONLY a valid JSON object. No markdown, no backticks, no explanation outside JSON.
+- All string values must use proper JSON escaping: use \\n for newlines, \\t for tabs, \\" for quotes INSIDE strings.
+- Do NOT include literal newline characters inside JSON string values.
 
 {
-  "extractedText": "<Full verbatim transcript. Format: 'User: message\\nThem: message'. Include ALL messages.>",
-  "detectedLanguage": "<ISO 639-1 code>",
+  "extractedText": "Full transcript. Use literal \\n to separate messages, like: User: hey\\nThem: hi\\nUser: how are you. Include ALL messages in order. Never include timestamps or read receipts.",
+  "detectedLanguage": "<ISO 639-1 code, e.g. en>",
+  "whoIsUser": "<which side you identified as the user, e.g. 'right-aligned blue bubbles'>",
 
   "layer1_diagnosis": {
-    "summary": "<3-5 sentence powerful diagnosis: emotional tone, who is investing more, current stage of the interaction (early interest / flirting / neutral / fading / escalating / platonic etc.), and where this conversation is headed if nothing changes.>",
+    "summary": "<3-5 sentence diagnosis: emotional tone, who is investing more, current stage, where it's headed if nothing changes.>",
     "stage": "<one of: early_interest | flirting | escalating | neutral | fading | reconnecting | professional | platonic>",
-    "verdict": "<one punchy sentence verdict on the overall conversation quality>"
+    "verdict": "<one punchy sentence verdict on overall conversation quality>"
   },
 
   "layer2_scores": {
-    "attraction":           { "score": <0-10 float>, "explanation": "<2-3 sentences explaining WHY this score, citing actual signals>" },
-    "interestLevel":        { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "engagement":           { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "curiosity":            { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "confidence":           { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "humor":                { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "emotionalConnection":  { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
-    "conversationalMomentum":{ "score": <0-10 float>, "explanation": "<2-3 sentences>" }
+    "attraction":             { "score": <0-10 float>, "explanation": "<2-3 sentences citing actual signals>" },
+    "interestLevel":          { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "engagement":             { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "curiosity":              { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "confidence":             { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "humor":                  { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "emotionalConnection":    { "score": <0-10 float>, "explanation": "<2-3 sentences>" },
+    "conversationalMomentum": { "score": <0-10 float>, "explanation": "<2-3 sentences>" }
   },
 
   "layer3_psychSignals": [
     {
-      "signal": "<signal name, e.g. 'Polite friendliness without warmth'>",
+      "signal": "<signal name, e.g. 'Mirroring', 'Anxiety Texting', 'Breadcrumbing'>",
       "detected": <true|false>,
-      "evidence": "<exact quote or paraphrase of the moment this appeared>",
-      "meaning": "<what this reveals about the other person's mindset, 2 sentences>"
+      "evidence": "<exact quote or close paraphrase from the conversation — NOT a timestamp>",
+      "meaning": "<what this reveals about the dynamic, 2 sentences>"
     }
   ],
 
@@ -92,90 +219,131 @@ Return ONLY valid JSON — no markdown, no backticks, no explanation outside the
     "whoHoldsPower": "<'user' | 'them' | 'balanced'>",
     "whoIsChasing": "<'user' | 'them' | 'neither'>",
     "whoIsLeading": "<'user' | 'them' | 'switching'>",
-    "analysis": "<3-4 sentences explaining the power balance. Be direct and specific about what's creating the imbalance.>",
-    "rebalanceTip": "<One specific thing the user can do to shift the power balance>"
+    "analysis": "<3-4 sentences explaining the power balance and what creates it.>",
+    "rebalanceTip": "<One specific actionable thing the user can do right now to shift the balance>"
   },
 
   "layer5_mistakes": [
     {
-      "mistake": "<mistake title>",
-      "whatHappened": "<what the user actually said/did>",
-      "whyItHurts": "<why this weakens attraction or connection, psychologically>",
-      "severity": "<'low'|'medium'|'high'>"
+      "mistake": "<short mistake title>",
+      "whatHappened": "<what the user actually said or did, quoted if possible>",
+      "whyItHurts": "<psychological reason why this weakens attraction or rapport>",
+      "severity": "<'low' | 'medium' | 'high'>"
     }
   ],
 
   "layer6_missedOpportunities": [
     {
-      "moment": "<what was said at this moment>",
-      "whatWasMissed": "<what opportunity was available here>",
-      "betterResponse": "<concrete example of a better reply that would have worked>"
+      "moment": "<what was actually said at this moment — must be a real message, not a timestamp>",
+      "whatWasMissed": "<the opportunity that existed at that moment>",
+      "betterResponse": "<concrete, specific better reply that would have worked>"
     }
   ],
 
   "layer7_rewrites": {
-    "originalMessage": "<the user's most recent or weakest message>",
-    "playful":   { "message": "<rewritten playful version>",   "why": "<why this works better>" },
-    "confident": { "message": "<rewritten confident version>", "why": "<why this works better>" },
-    "curious":   { "message": "<rewritten curious version>",   "why": "<why this works better>" }
+    "originalMessage": "<the user's most recent OR weakest message — quote it exactly>",
+    "playful":   { "message": "<rewritten playful version>",   "why": "<why this version works better, 1-2 sentences>" },
+    "confident": { "message": "<rewritten confident version>", "why": "<why this version works better, 1-2 sentences>" },
+    "curious":   { "message": "<rewritten curious version>",   "why": "<why this version works better, 1-2 sentences>" }
   },
 
   "layer8_attractionSignals": [
     {
       "signal": "<signal name>",
-      "type": "<'positive'|'negative'|'neutral'>",
-      "evidence": "<where in the conversation this appeared>",
-      "interpretation": "<what this signal means for the interaction>"
+      "type": "<'positive' | 'negative' | 'neutral'>",
+      "evidence": "<where in the conversation this appeared — a real message snippet>",
+      "interpretation": "<what this means for the interaction, 1-2 sentences>"
     }
   ],
 
   "layer9_nextMoves": {
-    "playful":   { "message": "<what to send>", "intent": "<what this achieves>" },
-    "curious":   { "message": "<what to send>", "intent": "<what this achieves>" },
-    "confident": { "message": "<what to send>", "intent": "<what this achieves>" }
+    "playful":   { "message": "<specific message to send>", "intent": "<what this achieves>" },
+    "curious":   { "message": "<specific message to send>", "intent": "<what this achieves>" },
+    "confident": { "message": "<specific message to send>", "intent": "<what this achieves>" }
   },
 
   "layer10_strategy": {
-    "primaryAdvice": "<2-3 sentences of the most important strategic advice for THIS specific conversation>",
-    "doThis": "<the single most important thing to do next>",
-    "avoidThis": "<the single most important thing to avoid>",
-    "urgency": "<'push_forward'|'slow_down'|'flirt_more'|'change_topic'|'disengage'|'maintain'>",
-    "longTermRead": "<honest assessment of whether this connection has potential and why>"
+    "primaryAdvice": "<2-3 sentences of the single most important strategic advice for THIS specific conversation>",
+    "doThis":        "<single most important action to take next>",
+    "avoidThis":     "<single most important thing to avoid doing>",
+    "urgency":       "<one of: push_forward | slow_down | flirt_more | change_topic | disengage | maintain>",
+    "longTermRead":  "<honest assessment of whether this connection has real potential>"
   },
 
-  "overallScore":         <float 0.0-10.0, weighted average>,
-  "interestLevel":        <integer 0-100, how interested THE OTHER PERSON seems>,
-  "attractionProbability":<integer 0-100>,
-  "conversationMomentum": "<'escalating'|'neutral'|'dying'>",
-  "emotionalTone":        "<'positive'|'neutral'|'negative'|'mixed'>",
-  "replyEnergyMatch":     "<'matched'|'low'|'high'>",
-  "contextFit":           "<brief note on how well this conversation fits the ${context} context>",
-  ${roastMode ? '"roastText": "<3-4 sentence roast, specific to what actually happened in this conversation>",' : ''}
+  "overallScore":          <float 0.0–10.0, weighted average of layer2 scores>,
+  "interestLevel":         <integer 0–100, how interested THE OTHER PERSON seems>,
+  "attractionProbability": <integer 0–100>,
+  "conversationMomentum":  "<'escalating' | 'neutral' | 'dying'>",
+  "emotionalTone":         "<'positive' | 'neutral' | 'negative' | 'mixed'>",
+  "replyEnergyMatch":      "<'matched' | 'low' | 'high'>",
+  "contextFit":            "<one sentence: how well the conversation fits the stated context>",
+  ${roastMode ? '"roastText": "<3-4 sentence roast that references actual specific messages — be specific, not generic>",' : ''}
   "tags": ["<tag1>", "<tag2>", "<tag3>"]
 }
 
-For tags, choose from: ["one-sided", "balanced", "flirty", "dead-convo", "good-banter", "overthinking", "under-investing", "great-opener", "missed-spark", "needs-confidence", "needs-humor", "needs-questions", "too-eager", "too-passive", "chemistry-detected", "friendship-zone", "professional", "reconnecting-well", "reconnecting-badly", "strong-start", "weak-close"]`;
+Tags — pick all that apply from:
+["one-sided","balanced","flirty","dead-convo","good-banter","overthinking","under-investing","great-opener","missed-spark","needs-confidence","needs-humor","needs-questions","too-eager","too-passive","chemistry-detected","friendship-zone","professional","reconnecting-well","reconnecting-badly","strong-start","weak-close","left-on-read-risk","good-momentum"]`;
 }
 
-// ─── POST ──────────────────────────────────────────────────────────────────────
+// ─── Points formula ───────────────────────────────────────────────────────────
+function scoreToPoints(score: number): number {
+  if (score >= 9.5) return 30;
+  if (score >= 9.0) return 25;
+  if (score >= 8.0) return 20;
+  if (score >= 7.0) return 14;
+  if (score >= 6.0) return 9;
+  if (score >= 5.0) return 5;
+  if (score >= 4.0) return 3;
+  return 1;
+}
+
+// ─── POST ─────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // ── Auth & paywall ──────────────────────────────────────────────────────
+    const session = await getServerSession(authOptions);
+    const userId  = (session?.user as any)?.id ?? null;
+
+    if (!userId) {
+      const cookieStore = await cookies();
+      const used = cookieStore.get(ANON_COOKIE)?.value === '1';
+      if (used) {
+        return NextResponse.json(
+          { error: 'paywall', message: 'Sign in to get 3 more free analyses.', requiresAuth: true },
+          { status: 402 }
+        );
+      }
+    } else {
+      await connectToDatabase();
+      const dbUser = await User.findById(userId).lean() as any;
+      if (dbUser) {
+        const isPaid = dbUser.subscriptionStatus === 'paid' || dbUser.subscriptionStatus === 'lifetime';
+        if (!isPaid && (dbUser.freeTriesUsed ?? 0) >= FREE_MAX) {
+          return NextResponse.json(
+            { error: 'paywall', message: `You've used all ${FREE_MAX} free analyses. Upgrade for unlimited.`, requiresUpgrade: true },
+            { status: 402 }
+          );
+        }
+      }
+    }
+
+    // ── Parse form data ─────────────────────────────────────────────────────
     const formData  = await request.formData();
     const image     = formData.get('image')     as File   | null;
     const inputText = formData.get('text')      as string | null;
     const context   = (formData.get('context')  as string) || 'dating';
     const language  = (formData.get('language') as string) || 'auto';
     const roastMode = formData.get('roastMode') === 'true';
-    const userId    = formData.get('userId')    as string | null;
+    const userSide  = (formData.get('userSide') as string) || 'auto';
 
     if (!image && !inputText?.trim()) {
       return NextResponse.json({ error: 'Provide an image or paste conversation text.' }, { status: 400 });
     }
 
-    const prompt = buildAnalysisPrompt(context, language, roastMode);
+    const prompt = buildPrompt(context, language, roastMode, userSide);
     let raw = '';
 
-    // ── Branch: vision vs text ─────────────────────────────────────────────
+    // ── AI call: vision (screenshot) vs text ────────────────────────────────
     if (image) {
       const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       if (!allowed.includes(image.type)) {
@@ -185,9 +353,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Image too large. Max 10MB.' }, { status: 400 });
       }
 
-      const bytes     = await image.arrayBuffer();
-      const base64    = Buffer.from(bytes).toString('base64');
-      const mediaType = image.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      const bytes  = await image.arrayBuffer();
+      const base64 = Buffer.from(bytes).toString('base64');
+      const mtype  = image.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 
       try {
         const completion = await groq.chat.completions.create({
@@ -195,130 +363,183 @@ export async function POST(request: NextRequest) {
           messages: [{
             role: 'user',
             content: [
-              { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
-              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mtype};base64,${base64}` } },
+              { type: 'text',      text: prompt },
             ],
           }],
-          temperature: 0.15,
-          max_tokens: 3000,
+          temperature: 0.10,
+          max_tokens:  3500,
         });
         raw = completion.choices[0]?.message?.content?.trim() ?? '';
       } catch (visionErr: any) {
+        // Fallback to maverick on rate-limit or overload
         if (visionErr?.status === 429 || visionErr?.status === 503) {
-          const completion = await groq.chat.completions.create({
+          const fallback = await groq.chat.completions.create({
             model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
             messages: [{
               role: 'user',
               content: [
-                { type: 'image_url', image_url: { url: `data:${mediaType};base64,${base64}` } },
-                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: `data:${mtype};base64,${base64}` } },
+                { type: 'text',      text: prompt },
               ],
             }],
-            temperature: 0.15,
-            max_tokens: 2500,
+            temperature: 0.10,
+            max_tokens:  3000,
           });
-          raw = completion.choices[0]?.message?.content?.trim() ?? '';
-        } else throw visionErr;
+          raw = fallback.choices[0]?.message?.content?.trim() ?? '';
+        } else {
+          throw visionErr;
+        }
       }
-
     } else {
-      // Text-only path — use a text model
+      // Text-only path
       const completion = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: prompt },
-          { role: 'user',   content: `Analyze this conversation:\n\n${inputText!.slice(0, 6000)}` },
+          { role: 'user',   content: `Analyze this conversation carefully:\n\n${inputText!.slice(0, 8000)}` },
         ],
-        temperature: 0.15,
-        max_tokens: 3000,
+        temperature: 0.10,
+        max_tokens:  3500,
       });
       raw = completion.choices[0]?.message?.content?.trim() ?? '';
     }
 
-    // ── Parse JSON ─────────────────────────────────────────────────────────
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    const match   = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) {
-      console.error('[Analyze] No JSON in response:', raw.slice(0, 400));
-      return NextResponse.json({ error: 'Could not parse analysis. Try a clearer screenshot or more complete text.' }, { status: 422 });
+    // ── Parse AI response ───────────────────────────────────────────────────
+    const parsed = parseAIResponse(raw);
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'Could not parse analysis. Try a clearer screenshot or more complete text.' },
+        { status: 422 }
+      );
     }
 
-    const parsed = JSON.parse(match[0]);
-
-    // ── Clamp helpers ──────────────────────────────────────────────────────
-    const clamp  = (v: any, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number(v) || 0));
-    const clampScore = (v: any) => clamp(v, 0, 10);
-    const sanitizeScoreObj = (obj: any) => obj
-      ? { score: clampScore(obj.score), explanation: String(obj.explanation || '') }
-      : { score: 5, explanation: '' };
+    // ── Shape & clamp the result ────────────────────────────────────────────
+    const clamp   = (v: any, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number(v) || 0));
+    const clampSc = (v: any) => clamp(v, 0, 10);
+    const sObj    = (o: any): { score: number; explanation: string } =>
+      o ? { score: clampSc(o.score), explanation: String(o.explanation || '') }
+        : { score: 5, explanation: '' };
 
     const result = {
-      extractedText:         String(parsed.extractedText || inputText || ''),
-      detectedLanguage:      String(parsed.detectedLanguage || language),
+      extractedText:    String(parsed.extractedText || inputText || ''),
+      detectedLanguage: String(parsed.detectedLanguage || language),
+      whoIsUser:        String(parsed.whoIsUser || ''),
 
-      layer1_diagnosis:      {
-        summary: String(parsed.layer1_diagnosis?.summary || ''),
-        stage:   String(parsed.layer1_diagnosis?.stage   || 'neutral'),
-        verdict: String(parsed.layer1_diagnosis?.verdict || ''),
+      layer1_diagnosis: {
+        summary: String((parsed.layer1_diagnosis as any)?.summary || ''),
+        stage:   String((parsed.layer1_diagnosis as any)?.stage   || 'neutral'),
+        verdict: String((parsed.layer1_diagnosis as any)?.verdict || ''),
       },
 
       layer2_scores: {
-        attraction:            sanitizeScoreObj(parsed.layer2_scores?.attraction),
-        interestLevel:         sanitizeScoreObj(parsed.layer2_scores?.interestLevel),
-        engagement:            sanitizeScoreObj(parsed.layer2_scores?.engagement),
-        curiosity:             sanitizeScoreObj(parsed.layer2_scores?.curiosity),
-        confidence:            sanitizeScoreObj(parsed.layer2_scores?.confidence),
-        humor:                 sanitizeScoreObj(parsed.layer2_scores?.humor),
-        emotionalConnection:   sanitizeScoreObj(parsed.layer2_scores?.emotionalConnection),
-        conversationalMomentum:sanitizeScoreObj(parsed.layer2_scores?.conversationalMomentum),
+        attraction:             sObj((parsed.layer2_scores as any)?.attraction),
+        interestLevel:          sObj((parsed.layer2_scores as any)?.interestLevel),
+        engagement:             sObj((parsed.layer2_scores as any)?.engagement),
+        curiosity:              sObj((parsed.layer2_scores as any)?.curiosity),
+        confidence:             sObj((parsed.layer2_scores as any)?.confidence),
+        humor:                  sObj((parsed.layer2_scores as any)?.humor),
+        emotionalConnection:    sObj((parsed.layer2_scores as any)?.emotionalConnection),
+        conversationalMomentum: sObj((parsed.layer2_scores as any)?.conversationalMomentum),
       },
 
-      layer3_psychSignals:    Array.isArray(parsed.layer3_psychSignals)    ? parsed.layer3_psychSignals.slice(0, 8)    : [],
-      layer4_powerDynamics:   parsed.layer4_powerDynamics   || {},
-      layer5_mistakes:        Array.isArray(parsed.layer5_mistakes)        ? parsed.layer5_mistakes.slice(0, 6)        : [],
-      layer6_missedOpportunities: Array.isArray(parsed.layer6_missedOpportunities) ? parsed.layer6_missedOpportunities.slice(0, 5) : [],
-      layer7_rewrites:        parsed.layer7_rewrites        || {},
-      layer8_attractionSignals: Array.isArray(parsed.layer8_attractionSignals) ? parsed.layer8_attractionSignals.slice(0, 8) : [],
-      layer9_nextMoves:       parsed.layer9_nextMoves       || {},
-      layer10_strategy:       parsed.layer10_strategy       || {},
+      layer3_psychSignals: Array.isArray(parsed.layer3_psychSignals)
+        ? (parsed.layer3_psychSignals as any[]).slice(0, 8)
+        : [],
 
-      // Top-level compat fields
-      overallScore:           clampScore(parsed.overallScore),
-      interestLevel:          clamp(parsed.interestLevel, 0, 100),
-      attractionProbability:  clamp(parsed.attractionProbability, 0, 100),
-      conversationMomentum:   ['escalating','neutral','dying'].includes(parsed.conversationMomentum) ? parsed.conversationMomentum : 'neutral',
-      emotionalTone:          ['positive','neutral','negative','mixed'].includes(parsed.emotionalTone) ? parsed.emotionalTone : 'neutral',
-      replyEnergyMatch:       ['matched','low','high'].includes(parsed.replyEnergyMatch) ? parsed.replyEnergyMatch : 'matched',
-      contextFit:             String(parsed.contextFit || ''),
-      tags:                   Array.isArray(parsed.tags) ? parsed.tags.slice(0, 8) : [],
+      layer4_powerDynamics: (parsed.layer4_powerDynamics as any) || {},
+
+      layer5_mistakes: Array.isArray(parsed.layer5_mistakes)
+        ? (parsed.layer5_mistakes as any[]).slice(0, 6)
+        : [],
+
+      layer6_missedOpportunities: Array.isArray(parsed.layer6_missedOpportunities)
+        ? (parsed.layer6_missedOpportunities as any[]).slice(0, 5)
+        : [],
+
+      layer7_rewrites:          (parsed.layer7_rewrites as any)        || {},
+      layer8_attractionSignals: Array.isArray(parsed.layer8_attractionSignals)
+        ? (parsed.layer8_attractionSignals as any[]).slice(0, 8)
+        : [],
+      layer9_nextMoves:  (parsed.layer9_nextMoves as any)  || {},
+      layer10_strategy:  (parsed.layer10_strategy as any)  || {},
+
+      overallScore:          clampSc(parsed.overallScore),
+      interestLevel:         clamp(parsed.interestLevel,         0, 100),
+      attractionProbability: clamp(parsed.attractionProbability, 0, 100),
+
+      conversationMomentum: ['escalating', 'neutral', 'dying'].includes(parsed.conversationMomentum as string)
+        ? (parsed.conversationMomentum as string)
+        : 'neutral',
+
+      emotionalTone: ['positive', 'neutral', 'negative', 'mixed'].includes(parsed.emotionalTone as string)
+        ? (parsed.emotionalTone as string)
+        : 'neutral',
+
+      replyEnergyMatch: ['matched', 'low', 'high'].includes(parsed.replyEnergyMatch as string)
+        ? (parsed.replyEnergyMatch as string)
+        : 'matched',
+
+      contextFit: String(parsed.contextFit || ''),
+      tags:       Array.isArray(parsed.tags) ? (parsed.tags as string[]).slice(0, 8) : [],
       roastMode,
-      roastText:              roastMode ? (parsed.roastText || '') : undefined,
+      roastText:  roastMode ? String(parsed.roastText || '') : undefined,
       context,
-      inputMode:              image ? 'screenshot' : 'text',
+      inputMode:  image ? 'screenshot' : 'text',
     };
 
-    // ── Persist ────────────────────────────────────────────────────────────
+    // ── Persist & update counters ─────────────────────────────────────────────
     let savedId: string | null = null;
-    try {
-      await connectToDatabase();
-      const doc = await ChatAnalysis.create({
-        userId:    userId || undefined,
-        conversationScore:     result.overallScore,
-        interestLevel:         result.interestLevel,
-        attractionProbability: result.attractionProbability,
-        conversationMomentum:  result.conversationMomentum,
-        emotionalTone:         result.emotionalTone,
-        roastMode,
-        roastText:             result.roastText,
-        extractedText:         result.extractedText,
-        fullAnalysis:          result,   // store full deep result
-      });
-      savedId = doc._id.toString();
-    } catch (dbErr) {
-      console.error('[Analyze DB] Non-fatal:', dbErr);
+
+    if (userId) {
+      try {
+        await connectToDatabase();
+        
+        // Add "as any" here to stop TS from complaining about "context"
+        const doc = await ChatAnalysis.create({
+          userId,
+          conversationScore:     result.overallScore,
+          interestLevel:         result.interestLevel,
+          attractionProbability: result.attractionProbability,
+          conversationMomentum:  result.conversationMomentum,
+          emotionalTone:         result.emotionalTone,
+          roastMode,
+          roastText:             result.roastText,
+          extractedText:         result.extractedText,
+          context,
+          inputMode:             result.inputMode,
+          fullAnalysis:          result, // Added this so it saves your 10-layer data!
+        } as any); 
+
+        // Wrap doc in (doc as any) so TS knows _id exists
+        savedId = (doc as any)._id.toString();
+
+        const pts = scoreToPoints(result.overallScore);
+        await User.findByIdAndUpdate(userId, {
+          $inc: {
+            freeTriesUsed:  1,
+            analysisCount:  1,
+            skillPoints:    pts,
+          },
+        });
+      } catch (dbErr) {
+        console.error('[Analyze DB] Non-fatal save error:', dbErr);
+      }
     }
 
-    return NextResponse.json({ success: true, id: savedId, ...result });
+    // ── Build response; set anon cookie if needed ────────────────────────────
+    const response = NextResponse.json({ success: true, id: savedId, ...result });
+
+    if (!userId) {
+      response.cookies.set(ANON_COOKIE, '1', {
+        maxAge:   60 * 60 * 24 * 90, // 90 days
+        httpOnly: true,
+        sameSite: 'lax',
+        path:     '/',
+      });
+    }
+
+    return response;
 
   } catch (err: any) {
     console.error('[Analyze API] Fatal:', err);

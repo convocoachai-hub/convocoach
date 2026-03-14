@@ -27,16 +27,15 @@ const handler = NextAuth({
         if (!existingUser) {
           // Create new user in our database
           await User.create({
-            email: user.email,
-            name: user.name,
-            image: user.image,
+            email: user.email || '',           // Fallback to empty string if null
+            name: user.name || 'Unknown User', // Fallback name
+            image: user.image || '',           // Fallback image
             freeTriesUsed: 0,
             subscriptionStatus: 'free',
             skillPoints: 0,
             skillLevel: 'Dry Texter',
-          });
+          } as any); // 'as any' stops TypeScript from over-analyzing the schema fields
         }
-
         return true;
       } catch (error) {
         console.error('SignIn callback error:', error);

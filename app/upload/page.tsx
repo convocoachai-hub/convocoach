@@ -4,454 +4,548 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
-  bg:'#060608', surface:'rgba(255,255,255,0.025)', surfaceHi:'rgba(255,255,255,0.045)',
-  border:'rgba(255,255,255,0.07)', borderHi:'rgba(255,255,255,0.14)',
-  text:'#F2F0EB', muted:'rgba(242,240,235,0.35)', muted2:'rgba(242,240,235,0.55)',
-  violet:'#5B4FE9', violetLo:'rgba(91,79,233,0.1)', violetHi:'rgba(91,79,233,0.25)',
-  violetBr:'#a5b4fc', green:'#6ee7b7', greenLo:'rgba(110,231,183,0.09)',
-  gold:'#fcd34d', goldLo:'rgba(252,211,77,0.09)', red:'#fca5a5',
-  redLo:'rgba(255,96,64,0.09)', pink:'#f9a8d4', pinkLo:'rgba(249,168,212,0.09)',
-  cyan:'#67e8f9', cyanLo:'rgba(103,232,249,0.09)',
+  cream: '#F3EDE2', ink: '#0F0C09', red: '#D13920',
+  warm1: '#E8E0D2', warm2: '#D4CBBA', muted: '#8A8074', mutedLt: '#BFB8AC',
+  amber: '#B87A10', green: '#2D8A4E', teal: '#3A7A8A',
 };
-const EO = { duration:0.65, ease:[0.16,1,0.3,1] } as const;
-const SP = { type:'spring', stiffness:210, damping:26 } as const;
 
-// ─── Context config ────────────────────────────────────────────────────────────
+// Mapped to old T shape so all logic below works unchanged
+const T = {
+  bg: C.cream, panel: C.warm1, card: C.cream, cardHi: C.warm1,
+  border: C.warm2, borderHi: C.ink,
+  text: C.ink, sub: C.muted, muted: C.mutedLt,
+  violet: C.red, violetLo: `${C.red}14`, violetHi: `${C.red}35`, violetBr: C.red,
+  coral: C.red, coralLo: `${C.red}10`, coralHi: `${C.red}28`,
+  green: C.green, greenLo: 'rgba(45,138,78,0.12)',
+  gold: C.amber, goldLo: `${C.amber}15`,
+  pink: '#A0426E', pinkLo: 'rgba(160,66,110,0.1)',
+  cyan: C.teal, cyanLo: 'rgba(58,122,138,0.1)',
+  red: C.red, redLo: `${C.red}10`,
+};
+
+const ease = [0.16, 1, 0.3, 1] as const;
+const sp = { type: 'spring', stiffness: 300, damping: 30 } as const;
+
 const CONTEXTS = [
-  { id:'dating',        label:'Dating',        sub:'Romantic / flirting',           color:C.pink,    bg:C.pinkLo },
-  { id:'situationship', label:'Situationship', sub:'Undefined / talking stage',     color:C.violet,  bg:C.violetLo },
-  { id:'office',        label:'Work',          sub:'Colleague / client / manager',  color:C.violetBr,bg:C.violetLo },
-  { id:'friendship',    label:'Friendship',    sub:'Friends / group chat',          color:C.green,   bg:C.greenLo },
-  { id:'networking',    label:'Networking',    sub:'Professional outreach',         color:C.gold,    bg:C.goldLo },
-  { id:'family',        label:'Family',        sub:'Parent / sibling / relative',   color:'#c4b5fd', bg:'rgba(196,181,253,0.09)' },
-  { id:'reconnecting',  label:'Reconnecting',  sub:'Someone from the past',         color:'#fdba74', bg:'rgba(253,186,116,0.09)' },
+  { id: 'dating',        label: 'Dating',        sub: 'Romantic / flirting',          color: C.red,   bg: `${C.red}10`,               emoji: '💘' },
+  { id: 'situationship', label: 'Situationship', sub: 'Talking stage / undefined',    color: '#A0426E', bg: 'rgba(160,66,110,0.1)',     emoji: '😵‍💫' },
+  { id: 'office',        label: 'Work',          sub: 'Colleague / client / boss',    color: C.teal,  bg: 'rgba(58,122,138,0.1)',      emoji: '💼' },
+  { id: 'friendship',    label: 'Friendship',    sub: 'Friends / group chat',         color: C.green, bg: 'rgba(45,138,78,0.1)',       emoji: '🫂' },
+  { id: 'networking',    label: 'Networking',    sub: 'Professional outreach',        color: C.amber, bg: `${C.amber}15`,              emoji: '🤝' },
+  { id: 'family',        label: 'Family',        sub: 'Parent / sibling / relative',  color: C.muted, bg: `${C.muted}15`,              emoji: '🏠' },
+  { id: 'reconnecting',  label: 'Reconnecting',  sub: 'Someone from the past',        color: '#8B6914', bg: 'rgba(139,105,20,0.1)',    emoji: '👋' },
 ];
 
 const LANGUAGES = [
-  {id:'auto',label:'Auto-detect'},{id:'en',label:'English'},{id:'hi',label:'Hindi / Hinglish'},
-  {id:'es',label:'Spanish'},{id:'fr',label:'French'},{id:'pt',label:'Portuguese'},
-  {id:'ar',label:'Arabic'},{id:'ja',label:'Japanese'},{id:'ko',label:'Korean'},
-  {id:'de',label:'German'},{id:'tr',label:'Turkish'},{id:'ru',label:'Russian'},
-  {id:'it',label:'Italian'},{id:'zh',label:'Chinese'},{id:'id',label:'Indonesian'},
+  { id: 'auto', label: 'Auto-detect' }, { id: 'en', label: 'English' }, { id: 'hi', label: 'Hindi / Hinglish' },
+  { id: 'es', label: 'Spanish' }, { id: 'fr', label: 'French' }, { id: 'pt', label: 'Portuguese' },
+  { id: 'ar', label: 'Arabic' }, { id: 'ja', label: 'Japanese' }, { id: 'ko', label: 'Korean' },
+  { id: 'de', label: 'German' }, { id: 'tr', label: 'Turkish' }, { id: 'ru', label: 'Russian' },
+  { id: 'it', label: 'Italian' }, { id: 'zh', label: 'Chinese' }, { id: 'id', label: 'Indonesian' },
 ];
+const LANG_MAP = Object.fromEntries(LANGUAGES.map(l => [l.id, l.label]));
 
-const LANG_NAMES: Record<string,string> = Object.fromEntries(LANGUAGES.map(l=>[l.id,l.label]));
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface ScoreObj { score:number; explanation:string; }
+interface ScoreObj { score: number; explanation: string }
 interface AnalysisResult {
-  overallScore:number; interestLevel:number; attractionProbability:number;
-  conversationMomentum:string; emotionalTone:string; replyEnergyMatch:string;
-  detectedLanguage:string; context:string; inputMode:string;
-  tags:string[]; roastMode:boolean; roastText?:string;
-  contextFit:string;
-  layer1_diagnosis:{ summary:string; stage:string; verdict:string };
-  layer2_scores:Record<string,ScoreObj>;
-  layer3_psychSignals:Array<{signal:string;detected:boolean;evidence:string;meaning:string}>;
-  layer4_powerDynamics:{ whoHoldsPower:string; whoIsChasing:string; whoIsLeading:string; analysis:string; rebalanceTip:string };
-  layer5_mistakes:Array<{mistake:string;whatHappened:string;whyItHurts:string;severity:string}>;
-  layer6_missedOpportunities:Array<{moment:string;whatWasMissed:string;betterResponse:string}>;
-  layer7_rewrites:{ originalMessage:string; playful:{message:string;why:string}; confident:{message:string;why:string}; curious:{message:string;why:string} };
-  layer8_attractionSignals:Array<{signal:string;type:string;evidence:string;interpretation:string}>;
-  layer9_nextMoves:{ playful:{message:string;intent:string}; curious:{message:string;intent:string}; confident:{message:string;intent:string} };
-  layer10_strategy:{ primaryAdvice:string; doThis:string; avoidThis:string; urgency:string; longTermRead:string };
-  extractedText:string;
+  overallScore: number; interestLevel: number; attractionProbability: number;
+  conversationMomentum: string; emotionalTone: string; replyEnergyMatch: string;
+  detectedLanguage: string; context: string; inputMode: string; contextFit: string;
+  tags: string[]; roastMode: boolean; roastText?: string;
+  layer1_diagnosis: { summary: string; stage: string; verdict: string };
+  layer2_scores: Record<string, ScoreObj>;
+  layer3_psychSignals: Array<{ signal: string; detected: boolean; evidence: string; meaning: string }>;
+  layer4_powerDynamics: { whoHoldsPower: string; whoIsChasing: string; whoIsLeading: string; analysis: string; rebalanceTip: string };
+  layer5_mistakes: Array<{ mistake: string; whatHappened: string; whyItHurts: string; severity: string }>;
+  layer6_missedOpportunities: Array<{ moment: string; whatWasMissed: string; betterResponse: string }>;
+  layer7_rewrites: { originalMessage: string; playful: { message: string; why: string }; confident: { message: string; why: string }; curious: { message: string; why: string } };
+  layer8_attractionSignals: Array<{ signal: string; type: string; evidence: string; interpretation: string }>;
+  layer9_nextMoves: { playful: { message: string; intent: string }; curious: { message: string; intent: string }; confident: { message: string; intent: string } };
+  layer10_strategy: { primaryAdvice: string; doThis: string; avoidThis: string; urgency: string; longTermRead: string };
+  extractedText: string;
 }
-
 interface CoachResult {
-  verdict:string; verdictLabel:string; analysis:string;
-  improvedVersion:string; whyItsBetter:string; quickTips:string[];
-  energyLevel:string; flags:string[];
+  verdict: string; verdictLabel: string; analysis: string;
+  improvedVersion: string; whyItsBetter: string; quickTips: string[]; flags: string[];
 }
 
-// ─── Shared primitives ─────────────────────────────────────────────────────────
-function I({children,c=C.violetBr}:{children:React.ReactNode;c?:string}){
-  return <span style={{fontFamily:"'Instrument Serif',serif",fontStyle:'italic',color:c,fontWeight:400}}>{children}</span>;
+// ─── SHARED UI ────────────────────────────────────────────────────────────────
+function Fade({ children, delay = 0, y = 18 }: { children: React.ReactNode; delay?: number; y?: number }) {
+  return (
+    <motion.div initial={{ opacity: 0, y }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease, delay }}>{children}</motion.div>
+  );
 }
-function Reveal({children,delay=0,y=16}:{children:React.ReactNode;delay?:number;y?:number}){
-  return <motion.div initial={{opacity:0,y}} animate={{opacity:1,y:0}} transition={{...EO,delay}}>{children}</motion.div>;
+
+// Editorial label (matches other pages)
+const LABEL: React.CSSProperties = {
+  fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
+  textTransform: 'uppercase', fontFamily: 'monospace',
+  color: C.red, display: 'block', marginBottom: 16,
+};
+
+// Pill badge – cream bg style
+function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', fontSize: 10.5, fontWeight: 800,
+      padding: '4px 10px', borderRadius: 6, background: bg, color,
+      textTransform: 'uppercase', letterSpacing: '0.07em',
+      fontFamily: 'monospace', whiteSpace: 'nowrap', border: `1px solid ${color}30`,
+    }}>{label}</span>
+  );
 }
-function Tag({label,color,bg}:{label:string;color:string;bg:string}){
-  return <span style={{display:'inline-block',fontSize:10,fontWeight:600,padding:'4px 10px',borderRadius:6,background:bg,color,textTransform:'uppercase',letterSpacing:'0.07em',fontFamily:"'DM Sans',sans-serif"}}>{label}</span>;
-}
-function ScoreBar({val,color,delay=0}:{val:number;color:string;delay?:number}){
-  return(
-    <div style={{height:3,background:'rgba(255,255,255,0.07)',borderRadius:99,overflow:'hidden'}}>
-      <motion.div style={{height:'100%',background:color,borderRadius:99}}
-        initial={{width:0}} animate={{width:`${(val/10)*100}%`}}
-        transition={{duration:1.3,delay,ease:[0.16,1,0.3,1]}}/>
+
+function AnimBar({ pct, color, delay = 0 }: { pct: number; color: string; delay?: number }) {
+  return (
+    <div style={{ height: 3, background: C.warm2, borderRadius: 99, overflow: 'hidden' }}>
+      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+        transition={{ duration: 1.3, ease, delay }}
+        style={{ height: '100%', background: color, borderRadius: 99 }} />
     </div>
   );
 }
 
-const STAGE_CFG:Record<string,{label:string;color:string}> = {
-  early_interest:{label:'Early Interest',color:C.cyan},
-  flirting:{label:'Flirting',color:C.pink},
-  escalating:{label:'Escalating',color:C.green},
-  neutral:{label:'Neutral',color:C.muted2},
-  fading:{label:'Fading',color:C.red},
-  reconnecting:{label:'Reconnecting',color:C.gold},
-  professional:{label:'Professional',color:C.violetBr},
-  platonic:{label:'Platonic',color:C.muted2},
-};
-const MOM:Record<string,{label:string;color:string;bg:string}> = {
-  escalating:{label:'Rising',color:C.green,bg:C.greenLo},
-  neutral:{label:'Neutral',color:C.gold,bg:C.goldLo},
-  dying:{label:'Fading',color:C.red,bg:C.redLo},
-};
-const SEV:Record<string,string> = { high:C.red, medium:C.gold, low:C.muted2 };
-const SIG:Record<string,string> = { positive:C.green, negative:C.red, neutral:C.muted2 };
-const SCORE_META = [
-  {key:'attraction',label:'Attraction',color:C.pink},
-  {key:'interestLevel',label:'Interest',color:C.violetBr},
-  {key:'engagement',label:'Engagement',color:C.green},
-  {key:'curiosity',label:'Curiosity',color:C.cyan},
-  {key:'confidence',label:'Confidence',color:C.gold},
-  {key:'humor',label:'Humor',color:'#fdba74'},
-  {key:'emotionalConnection',label:'Emotional Bond',color:C.pink},
-  {key:'conversationalMomentum',label:'Momentum',color:C.green},
-];
-
-// ──────────────────────────────────────────────────────────────────────────────
-// STEP 1 — Context picker
-// ──────────────────────────────────────────────────────────────────────────────
-function StepContext({onNext}:{onNext:(ctx:string)=>void}){
-  const [sel,setSel]=useState<string|null>(null);
-  return(
-    <div>
-      <Reveal>
-        <div style={{marginBottom:28}}>
-          <p style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:600,marginBottom:10}}>Step 1 of 3</p>
-          <h2 style={{fontSize:'clamp(24px,5vw,38px)',fontWeight:500,lineHeight:1.05,letterSpacing:'-0.02em',color:C.text,margin:'0 0 8px',fontFamily:"'DM Sans',sans-serif"}}>
-            What kind of<br/><I>conversation is this?</I>
-          </h2>
-          <p style={{fontSize:13,color:C.muted,lineHeight:1.7,margin:0}}>Context shapes the whole analysis. Dating vs office chats are judged completely differently.</p>
+function Ring({ value, max, color, size, label }: { value: number; max: number; color: string; size: number; label: string }) {
+  const r = size / 2 - 8; const circ = 2 * Math.PI * r;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(243,237,226,0.15)" strokeWidth={6} />
+          <motion.circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round"
+            initial={{ strokeDasharray: `0 ${circ}` }}
+            animate={{ strokeDasharray: `${(value/max)*circ} ${circ}` }}
+            transition={{ duration: 1.5, ease, delay: 0.3 }} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+          <span style={{ fontSize: size < 90 ? 16 : 20, fontWeight: 900, color, fontFamily: "'Bricolage Grotesque', sans-serif", lineHeight: 1 }}>
+            {max === 10 ? value.toFixed(1) : `${Math.round(value)}`}
+          </span>
+          {max !== 10 && <span style={{ fontSize: 10, color: `${C.cream}50` }}>%</span>}
         </div>
-      </Reveal>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,200px),1fr))',gap:9,marginBottom:24}}>
-        {CONTEXTS.map((ctx,i)=>{
-          const active=sel===ctx.id;
-          return(
-            <Reveal key={ctx.id} delay={0.04+i*0.04}>
-              <motion.button onClick={()=>setSel(ctx.id)} whileHover={{scale:1.02}} whileTap={{scale:0.98}}
-                style={{width:'100%',textAlign:'left',cursor:'pointer',background:active?ctx.bg:C.surface,
-                  border:`1px solid ${active?ctx.color+'50':C.border}`,borderRadius:14,padding:'14px 16px',
-                  transition:'all 0.2s',outline:'none',
-                  boxShadow:active?`0 0 0 1px ${ctx.color}25,0 4px 20px ${ctx.color}10`:'none'}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
-                  <span style={{fontSize:13,fontWeight:600,color:active?ctx.color:C.text,fontFamily:"'DM Sans',sans-serif",transition:'color 0.2s'}}>{ctx.label}</span>
-                  {active&&<motion.div initial={{scale:0}} animate={{scale:1}} transition={SP}
-                    style={{width:16,height:16,borderRadius:'50%',background:ctx.color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5l2 2L7.5 2" stroke="#060608" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </motion.div>}
+      </div>
+      <span style={{ fontSize: 10.5, color: `${C.cream}55`, textAlign: 'center', fontWeight: 700, letterSpacing: '0.06em', fontFamily: 'monospace', textTransform: 'uppercase' }}>{label}</span>
+    </div>
+  );
+}
+
+// Accordion section — cream card style
+function Section({ title, accent, badge, defaultOpen = false, children }: {
+  title: string; accent?: string; badge?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{
+      background: C.cream, border: `1.5px solid ${open && accent ? `${accent}40` : C.warm2}`,
+      borderRadius: 18, overflow: 'hidden', transition: 'border-color 0.2s',
+      boxShadow: open ? '0 4px 16px rgba(15,12,9,0.06)' : '0 1px 4px rgba(15,12,9,0.03)',
+    }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+        padding: '18px 22px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+      }}>
+        {accent && <div style={{ width: 3, height: 18, borderRadius: 2, background: accent, flexShrink: 0 }} />}
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: C.ink, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{title}</span>
+        {badge && <div style={{ flexShrink: 0 }}>{badge}</div>}
+        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.22 }}
+          style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 4l4 4 4-4" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </motion.div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease }} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '4px 22px 22px', borderTop: `1px solid ${C.warm2}` }}>{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── STEP 1 — CONTEXT ─────────────────────────────────────────────────────────
+function StepContext({ onNext }: { onNext: (ctx: string) => void }) {
+  const [sel, setSel] = useState<string | null>(null);
+  return (
+    <div>
+      <Fade>
+        <span style={LABEL}>Step 1 of 3</span>
+        <h1 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(36px, 7vw, 62px)', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.03em', color: C.ink, margin: '0 0 16px' }}>
+          What kind of<br /><em style={{ fontStyle: 'italic', color: C.red, fontFamily: 'Georgia, serif', fontWeight: 400 }}>conversation?</em>
+        </h1>
+        <p style={{ fontSize: 15.5, color: C.muted, lineHeight: 1.75, margin: '0 0 36px', maxWidth: 420 }}>
+          Context changes everything. A "hey" in dating hits different than a "hey" in a work email.
+        </p>
+      </Fade>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 195px), 1fr))', gap: 10, marginBottom: 32 }}>
+        {CONTEXTS.map((ctx, i) => {
+          const active = sel === ctx.id;
+          return (
+            <Fade key={ctx.id} delay={0.04 + i * 0.04}>
+              <motion.button onClick={() => setSel(ctx.id)}
+                whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}
+                style={{
+                  width: '100%', textAlign: 'left', cursor: 'pointer',
+                  background: active ? ctx.bg : C.cream,
+                  border: `1.5px solid ${active ? ctx.color + '60' : C.warm2}`,
+                  borderRadius: 16, padding: '16px 18px', outline: 'none',
+                  boxShadow: active ? `0 4px 20px ${ctx.color}18` : '0 1px 4px rgba(15,12,9,0.04)',
+                  transition: 'all 0.2s',
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ fontSize: 18 }}>{ctx.emoji}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: active ? ctx.color : C.ink, fontFamily: "'Bricolage Grotesque', sans-serif", transition: 'color 0.2s' }}>
+                      {ctx.label}
+                    </span>
+                  </div>
+                  <AnimatePresence>
+                    {active && (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={sp}
+                        style={{ width: 16, height: 16, borderRadius: '50%', background: ctx.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l1.8 1.8L6.5 2" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <div style={{fontSize:11,color:C.muted}}>{ctx.sub}</div>
+                <p style={{ fontSize: 11.5, color: active ? ctx.color : C.mutedLt, margin: 0, paddingLeft: 27, fontFamily: "'DM Sans', sans-serif", transition: 'color 0.2s' }}>{ctx.sub}</p>
               </motion.button>
-            </Reveal>
+            </Fade>
           );
         })}
       </div>
-      <Reveal delay={0.32}>
-        <motion.button onClick={()=>sel&&onNext(sel)} whileHover={sel?{scale:1.02}:{}} whileTap={sel?{scale:0.98}:{}}
-          style={{width:'100%',padding:'14px 24px',borderRadius:13,border:'none',
-            background:sel?C.text:'rgba(255,255,255,0.06)',color:sel?C.bg:C.muted,
-            fontSize:14,fontWeight:600,cursor:sel?'pointer':'not-allowed',fontFamily:"'DM Sans',sans-serif",
-            transition:'all 0.25s',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+
+      <Fade delay={0.36}>
+        <motion.button onClick={() => sel && onNext(sel)}
+          whileHover={sel ? { scale: 1.015 } : {}} whileTap={sel ? { scale: 0.985 } : {}}
+          style={{
+            width: '100%', padding: '17px 28px', borderRadius: 14, border: 'none',
+            background: sel ? C.ink : C.warm1,
+            color: sel ? C.cream : C.mutedLt,
+            fontSize: 16, fontWeight: 800, cursor: sel ? 'pointer' : 'default',
+            fontFamily: "'Bricolage Grotesque', sans-serif", transition: 'all 0.25s',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+          }}>
           Continue
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7.5 2.5l4.5 4.5-4.5 4.5" stroke={sel?C.bg:C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M3 9h12M9 4l5 5-5 5" stroke={sel ? C.cream : C.mutedLt} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </motion.button>
-      </Reveal>
+      </Fade>
     </div>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// STEP 2 — Upload / Text input
-// ──────────────────────────────────────────────────────────────────────────────
-function StepUpload({context,onBack,onAnalyze}:{context:string;onBack:()=>void;onAnalyze:(file:File|null,text:string|null,lang:string,roast:boolean)=>void}){
-  const [inputMode,setInputMode]=useState<'screenshot'|'text'>('screenshot');
-  const [file,setFile]=useState<File|null>(null);
-  const [preview,setPreview]=useState<string|null>(null);
-  const [chatText,setChatText]=useState('');
-  const [language,setLanguage]=useState('auto');
-  const [roastMode,setRoastMode]=useState(false);
-  const [dragging,setDragging]=useState(false);
-  const inputRef=useRef<HTMLInputElement>(null);
-  const ctxObj=CONTEXTS.find(c=>c.id===context)!;
+// ─── STEP 2 — UPLOAD ──────────────────────────────────────────────────────────
+function StepUpload({ context, onBack, onAnalyze }: {
+  context: string; onBack: () => void;
+  onAnalyze: (file: File | null, text: string | null, lang: string, roast: boolean, userSide: string) => void;
+}) {
+  const [mode, setMode] = useState<'screenshot' | 'text'>('screenshot');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [lang, setLang] = useState('auto');
+  const [roast, setRoast] = useState(false);
+  const [drag, setDrag] = useState(false);
+  const [sideChosen, setSideChosen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const ctx = CONTEXTS.find(c => c.id === context)!;
 
-  const handleFile=useCallback((f:File)=>{
-    if(!f.type.startsWith('image/'))return;
-    setFile(f); setPreview(URL.createObjectURL(f));
-  },[]);
+  const onFile = useCallback((f: File) => {
+    if (!f.type.startsWith('image/')) return;
+    setFile(f); setPreview(URL.createObjectURL(f)); setSideChosen(false);
+  }, []);
 
-  const canSubmit = inputMode==='screenshot' ? !!file : chatText.trim().length>30;
-
-  return(
+  return (
     <div>
-      <Reveal>
-        <div style={{marginBottom:22}}>
-          <button onClick={onBack} style={{display:'inline-flex',alignItems:'center',gap:6,background:'none',border:'none',color:C.muted,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",padding:0,marginBottom:12}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 7H2M5.5 3L2 7l3.5 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Back
-          </button>
-          <p style={{fontSize:10,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:600,marginBottom:10}}>Step 2 of 3</p>
-          <h2 style={{fontSize:'clamp(22px,5vw,34px)',fontWeight:500,lineHeight:1.05,letterSpacing:'-0.02em',color:C.text,margin:'0 0 6px',fontFamily:"'DM Sans',sans-serif"}}>
-            Add your <I c={ctxObj.color}>{ctxObj.label.toLowerCase()} chat.</I>
-          </h2>
-        </div>
-      </Reveal>
+      <Fade>
+        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: C.muted, fontSize: 13.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", padding: '0 0 20px 0', fontWeight: 600 }}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 7.5H3M6 3.5L3 7.5l3 4" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Back
+        </button>
+        <span style={LABEL}>Step 2 of 3</span>
+        <h1 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(32px, 6vw, 52px)', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.03em', color: C.ink, margin: '0 0 14px' }}>
+          Add your <em style={{ fontStyle: 'italic', color: ctx.color, fontFamily: 'Georgia, serif', fontWeight: 400 }}>{ctx.label.toLowerCase()} chat.</em>
+        </h1>
+        <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.75, margin: '0 0 28px' }}>
+          Screenshot or paste — the clearer it is, the sharper the analysis.
+        </p>
+      </Fade>
 
-      {/* Mode toggle */}
-      <Reveal delay={0.06}>
-        <div style={{display:'flex',background:C.surface,borderRadius:12,padding:4,marginBottom:16,border:`1px solid ${C.border}`}}>
-          {(['screenshot','text'] as const).map(m=>(
-            <button key={m} onClick={()=>setInputMode(m)}
-              style={{flex:1,padding:'9px 12px',borderRadius:9,border:'none',cursor:'pointer',
-                background:inputMode===m?C.surfaceHi:'transparent',
-                color:inputMode===m?C.text:C.muted,
-                fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",
-                textTransform:'uppercase',letterSpacing:'0.08em',transition:'all 0.2s'}}>
-              {m==='screenshot'?'Screenshot':'Paste Text'}
+      <Fade delay={0.06}>
+        <div style={{ display: 'flex', background: C.warm1, borderRadius: 12, padding: 4, marginBottom: 22, border: `1.5px solid ${C.warm2}`, gap: 4 }}>
+          {(['screenshot', 'text'] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              flex: 1, padding: '12px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+              background: mode === m ? C.ink : 'transparent',
+              color: mode === m ? C.cream : C.muted,
+              fontSize: 14.5, fontWeight: 700,
+              fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s',
+            }}>
+              {m === 'screenshot' ? '📸  Screenshot' : '✍️  Paste Text'}
             </button>
           ))}
         </div>
-      </Reveal>
+      </Fade>
 
       <AnimatePresence mode="wait">
-        {inputMode==='screenshot'?(
-          <motion.div key="ss" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={EO}>
-            <div onClick={()=>inputRef.current?.click()}
-              onDrop={e=>{e.preventDefault();setDragging(false);const f=e.dataTransfer.files[0];if(f)handleFile(f);}}
-              onDragOver={e=>{e.preventDefault();setDragging(true);}}
-              onDragLeave={()=>setDragging(false)}
-              style={{border:`1.5px dashed ${dragging?ctxObj.color:file?C.border:'rgba(255,255,255,0.1)'}`,
-                borderRadius:18,cursor:'pointer',marginBottom:14,
-                background:dragging?`${ctxObj.color}06`:C.surface,
-                transition:'all 0.2s',overflow:'hidden',minHeight:file?0:140}}>
-              {file&&preview?(
-                <div style={{position:'relative'}}>
-                  <img src={preview} alt="preview" style={{width:'100%',maxHeight:340,objectFit:'contain',display:'block',borderRadius:16}}/>
-                  <motion.button whileHover={{scale:1.04}} whileTap={{scale:0.96}}
-                    onClick={e=>{e.stopPropagation();setFile(null);setPreview(null);}}
-                    style={{position:'absolute',top:10,right:10,background:'rgba(6,6,8,0.85)',border:`1px solid ${C.border}`,
-                      borderRadius:9,padding:'6px 14px',color:C.text,fontSize:12,fontWeight:600,cursor:'pointer',
-                      fontFamily:"'DM Sans',sans-serif",backdropFilter:'blur(8px)'}}>
+        {mode === 'screenshot' ? (
+          <motion.div key="ss" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease }}>
+            <div
+              onClick={() => !file && inputRef.current?.click()}
+              onDrop={e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}
+              onDragOver={e => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              style={{
+                border: `2px dashed ${drag ? ctx.color : file ? C.ink : C.warm2}`,
+                borderRadius: 18, cursor: file ? 'default' : 'pointer', marginBottom: 16,
+                background: drag ? `${ctx.color}06` : C.warm1, transition: 'all 0.2s',
+                overflow: 'hidden', minHeight: file ? 0 : 200,
+              }}>
+              {file && preview ? (
+                <div style={{ position: 'relative' }}>
+                  <img src={preview} alt="preview" style={{ width: '100%', maxHeight: 420, objectFit: 'contain', display: 'block' }} />
+                  <button onClick={e => { e.stopPropagation(); setFile(null); setPreview(null); setSideChosen(false); }}
+                    style={{ position: 'absolute', top: 12, right: 12, background: `${C.ink}E8`, backdropFilter: 'blur(8px)', border: `1px solid rgba(243,237,226,0.15)`, borderRadius: 9, padding: '8px 16px', color: C.cream, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                     Change
-                  </motion.button>
+                  </button>
                 </div>
-              ):(
-                <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'36px 24px',gap:10}}>
-                  <motion.div animate={dragging?{scale:1.15}:{scale:1}} transition={SP}
-                    style={{width:44,height:44,borderRadius:12,background:C.surfaceHi,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <path d="M10 13V3M6 7l4-4 4 4" stroke={C.muted2} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M3 16h14" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round"/>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '52px 28px', gap: 16 }}>
+                  <motion.div animate={drag ? { scale: 1.15 } : { scale: 1 }} transition={sp}
+                    style={{ width: 56, height: 56, borderRadius: 16, background: C.warm2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                      <path d="M13 17V4M9 8l4-4 4 4" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2 21h22" stroke={C.mutedLt} strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
                   </motion.div>
-                  <div style={{textAlign:'center'}}>
-                    <div style={{fontSize:13,fontWeight:500,color:C.muted2,marginBottom:3}}>Drop screenshot or tap to browse</div>
-                    <div style={{fontSize:11,color:C.muted}}>JPG, PNG, WebP · Max 10MB</div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: C.ink, margin: '0 0 6px', fontFamily: "'Bricolage Grotesque', sans-serif" }}>Drop your screenshot here</p>
+                    <p style={{ fontSize: 13, color: C.muted, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>Or tap to browse · JPG, PNG, WebP · Max 10MB</p>
                   </div>
                 </div>
               )}
             </div>
-            <input ref={inputRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files?.[0];if(f)handleFile(f);}}/>
+            <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+
+            {file && (
+              <Fade>
+                <div style={{ background: C.cream, border: `1.5px solid ${C.warm2}`, borderRadius: 16, padding: '20px 22px', marginBottom: 16 }}>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: C.ink, margin: '0 0 7px', fontFamily: "'Bricolage Grotesque', sans-serif" }}>🎯 Which side are YOUR messages?</p>
+                  <p style={{ fontSize: 13.5, color: C.muted, margin: '0 0 18px', lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>
+                    This stops the AI from mixing you up with the other person — the #1 cause of wrong analysis.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    {[
+                      { side: 'right', label: 'Right side', sub: 'Blue / filled bubbles', preview: <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}><div style={{ background: `${C.ink}`, borderRadius: '9px 9px 2px 9px', padding: '5px 9px', fontSize: 10.5, color: C.cream }}>hey, you free?</div><div style={{ background: C.warm1, border: `1px solid ${C.warm2}`, borderRadius: '9px 9px 2px 9px', padding: '5px 9px', fontSize: 10.5, color: C.muted }}>yeah why?</div></div> },
+                      { side: 'left', label: 'Left side', sub: 'Grey / hollow bubbles', preview: <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}><div style={{ background: C.ink, borderRadius: '9px 9px 9px 2px', padding: '5px 9px', fontSize: 10.5, color: C.cream }}>hey, you free?</div><div style={{ background: C.warm1, border: `1px solid ${C.warm2}`, borderRadius: '9px 9px 9px 2px', padding: '5px 9px', fontSize: 10.5, color: C.muted }}>yeah why?</div></div> },
+                    ].map(opt => (
+                      <motion.button key={opt.side} whileHover={{ scale: 1.02, borderColor: C.ink }} whileTap={{ scale: 0.98 }}
+                        onClick={() => { setSideChosen(true); onAnalyze(file, null, lang, roast, opt.side); }}
+                        style={{ background: C.warm1, border: `1.5px solid ${C.warm2}`, borderRadius: 13, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s' }}>
+                        <div style={{ marginBottom: 10 }}>{opt.preview}</div>
+                        <p style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, margin: '0 0 3px', fontFamily: "'Bricolage Grotesque', sans-serif" }}>{opt.label}</p>
+                        <p style={{ fontSize: 11.5, color: C.muted, margin: 0 }}>{opt.sub}</p>
+                      </motion.button>
+                    ))}
+                  </div>
+                  <button onClick={() => { setSideChosen(true); onAnalyze(file, null, lang, roast, 'auto'); }}
+                    style={{ width: '100%', background: 'none', border: `1px solid ${C.warm2}`, borderRadius: 10, padding: '11px', color: C.muted, fontSize: 13.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, transition: 'border-color 0.15s' }}>
+                    Not sure — let AI figure it out
+                  </button>
+                </div>
+              </Fade>
+            )}
           </motion.div>
-        ):(
-          <motion.div key="txt" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={EO}>
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:600,display:'block',marginBottom:8}}>
-                Paste your conversation
-              </label>
-              <textarea
-                value={chatText} onChange={e=>setChatText(e.target.value)}
-                placeholder={`Format like:\nYou: hey what's up\nThem: not much, you?\nYou: just chilling...\n\n(or paste it however you have it)`}
-                style={{width:'100%',minHeight:200,background:C.surface,border:`1px solid ${C.border}`,
-                  borderRadius:14,padding:'14px 16px',color:C.text,fontSize:13,lineHeight:1.7,
-                  fontFamily:"'DM Sans',sans-serif",resize:'vertical',outline:'none',
-                  transition:'border-color 0.2s',boxSizing:'border-box'}}
-                onFocus={e=>e.currentTarget.style.borderColor=C.violetHi}
-                onBlur={e=>e.currentTarget.style.borderColor=C.border}
-              />
-              <div style={{fontSize:11,color:chatText.length>30?C.green:C.muted,marginTop:6,textAlign:'right'}}>
-                {chatText.length} chars {chatText.length<30&&'— add more for better analysis'}
-              </div>
-            </div>
+        ) : (
+          <motion.div key="txt" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease }}>
+            <label style={{ fontSize: 11, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 10, fontFamily: 'monospace' }}>
+              Paste your conversation
+            </label>
+            <textarea value={text} onChange={e => setText(e.target.value)}
+              placeholder={'Format:\nYou: hey whats up\nThem: not much hbu\nYou: just chilling\n\n(or paste however you have it)'}
+              style={{ width: '100%', minHeight: 240, background: C.warm1, border: `1.5px solid ${C.warm2}`, borderRadius: 16, padding: '18px 20px', color: C.ink, fontSize: 14.5, lineHeight: 1.8, fontFamily: "'DM Sans', sans-serif", resize: 'vertical', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', marginBottom: 8 }}
+              onFocus={e => e.currentTarget.style.borderColor = C.ink}
+              onBlur={e => e.currentTarget.style.borderColor = C.warm2} />
+            <p style={{ fontSize: 13, color: text.length > 30 ? C.green : C.mutedLt, marginBottom: 20, textAlign: 'right', fontFamily: "'DM Sans', sans-serif" }}>
+              {text.length} chars {text.length < 30 && '— add more for better analysis'}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Language */}
-      <Reveal delay={0.12}>
-        <div style={{marginBottom:12}}>
-          <label style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:600,display:'block',marginBottom:8}}>Language</label>
-          <div style={{position:'relative'}}>
-            <select value={language} onChange={e=>setLanguage(e.target.value)}
-              style={{width:'100%',background:C.surface,border:`1px solid ${C.border}`,borderRadius:11,
-                padding:'11px 38px 11px 14px',color:C.text,fontSize:13,fontWeight:500,
-                fontFamily:"'DM Sans',sans-serif",cursor:'pointer',appearance:'none',outline:'none'}}>
-              {LANGUAGES.map(l=><option key={l.id} value={l.id} style={{background:'#111'}}>{l.label}</option>)}
+      <Fade delay={0.12}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 11, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', display: 'block', marginBottom: 10, fontFamily: 'monospace' }}>Language</label>
+          <div style={{ position: 'relative' }}>
+            <select value={lang} onChange={e => setLang(e.target.value)}
+              style={{ width: '100%', background: C.warm1, border: `1.5px solid ${C.warm2}`, borderRadius: 12, padding: '13px 40px 13px 16px', color: C.ink, fontSize: 14.5, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', appearance: 'none', outline: 'none' }}>
+              {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
-            <div style={{position:'absolute',right:13,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 3.5l3.5 3.5L9 3.5" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
           </div>
         </div>
-      </Reveal>
+      </Fade>
 
-      {/* Roast toggle */}
-      <Reveal delay={0.16}>
-        <motion.button onClick={()=>setRoastMode(r=>!r)} whileTap={{scale:0.98}}
-          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
-            background:roastMode?C.redLo:C.surface,border:`1px solid ${roastMode?C.red+'40':C.border}`,
-            borderRadius:13,padding:'13px 16px',cursor:'pointer',transition:'all 0.2s',marginBottom:18,outline:'none'}}>
-          <div style={{textAlign:'left'}}>
-            <div style={{fontSize:13,fontWeight:600,color:roastMode?C.red:C.text,fontFamily:"'DM Sans',sans-serif"}}>Roast Mode</div>
-            <div style={{fontSize:11,color:C.muted,marginTop:2}}>Brutal honesty. No mercy.</div>
+      <Fade delay={0.16}>
+        <motion.button onClick={() => setRoast(r => !r)} whileTap={{ scale: 0.99 }}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: roast ? `${C.red}08` : C.cream, border: `1.5px solid ${roast ? `${C.red}35` : C.warm2}`,
+            borderRadius: 14, padding: '16px 20px', cursor: 'pointer', transition: 'all 0.2s', marginBottom: 22, outline: 'none',
+          }}>
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ fontSize: 15, fontWeight: 800, color: roast ? C.red : C.ink, fontFamily: "'Bricolage Grotesque', sans-serif", margin: '0 0 4px' }}>🔥 Roast Mode</p>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>Brutal honesty. No sugarcoating whatsoever.</p>
           </div>
-          <div style={{width:42,height:23,borderRadius:12,background:roastMode?C.red:'rgba(255,255,255,0.1)',transition:'background 0.2s',position:'relative',flexShrink:0}}>
-            <motion.div animate={{x:roastMode?21:2}} transition={SP}
-              style={{position:'absolute',top:2.5,width:18,height:18,borderRadius:'50%',background:'#fff'}}/>
+          <div style={{ width: 46, height: 26, borderRadius: 13, background: roast ? C.red : C.warm2, transition: 'background 0.2s', position: 'relative', flexShrink: 0 }}>
+            <motion.div animate={{ x: roast ? 22 : 3 }} transition={sp}
+              style={{ position: 'absolute', top: 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(15,12,9,0.2)' }} />
           </div>
         </motion.button>
-      </Reveal>
+      </Fade>
 
-      <Reveal delay={0.20}>
-        <motion.button onClick={()=>canSubmit&&onAnalyze(inputMode==='screenshot'?file:null,inputMode==='text'?chatText:null,language,roastMode)}
-          whileHover={canSubmit?{scale:1.02}:{}} whileTap={canSubmit?{scale:0.98}:{}}
-          style={{width:'100%',padding:'15px 24px',borderRadius:13,border:'none',
-            background:canSubmit?C.text:'rgba(255,255,255,0.06)',color:canSubmit?C.bg:C.muted,
-            fontSize:14,fontWeight:700,cursor:canSubmit?'pointer':'not-allowed',
-            fontFamily:"'DM Sans',sans-serif",transition:'all 0.25s',
-            display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
-          Run Deep Analysis
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 7.5h11M8.5 3l4.5 4.5-4.5 4.5" stroke={canSubmit?C.bg:C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </motion.button>
-      </Reveal>
+      {mode === 'text' && (
+        <Fade delay={0.20}>
+          <motion.button onClick={() => text.trim().length > 30 && onAnalyze(null, text, lang, roast, 'auto')}
+            whileHover={text.trim().length > 30 ? { scale: 1.015 } : {}}
+            whileTap={text.trim().length > 30 ? { scale: 0.985 } : {}}
+            style={{
+              width: '100%', padding: '17px 28px', borderRadius: 14, border: 'none',
+              background: text.trim().length > 30 ? C.ink : C.warm1,
+              color: text.trim().length > 30 ? C.cream : C.mutedLt,
+              fontSize: 16, fontWeight: 800, cursor: text.trim().length > 30 ? 'pointer' : 'default',
+              fontFamily: "'Bricolage Grotesque', sans-serif", transition: 'all 0.25s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            }}>
+            Run Deep Analysis
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M3 9h12M9 4l5 5-5 5" stroke={text.trim().length > 30 ? C.cream : C.mutedLt} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </motion.button>
+        </Fade>
+      )}
     </div>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// LIVE COACH WIDGET
-// ──────────────────────────────────────────────────────────────────────────────
-function LiveCoach({extractedText,context}:{extractedText:string;context:string}){
-  const [draft,setDraft]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [result,setResult]=useState<CoachResult|null>(null);
-  const [error,setError]=useState<string|null>(null);
+// ─── LOADING ──────────────────────────────────────────────────────────────────
+const LOAD_LINES = ['Reading your conversation…', 'Figuring out who is who…', 'Analyzing message patterns…', 'Detecting power dynamics…', 'Measuring attraction signals…', 'Finding missed moments…', 'Building your 10-layer report…'];
 
-  const runCoach=async()=>{
-    if(!draft.trim()||loading)return;
-    setLoading(true); setResult(null); setError(null);
-    try{
-      const res=await fetch('/api/coach',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({draftMessage:draft,conversationHistory:extractedText,context})});
-      const data=await res.json();
-      if(!data.success)throw new Error(data.error||'Coach failed');
-      setResult(data);
-    }catch(e:any){setError(e.message);}
-    finally{setLoading(false);}
-  };
-
-  const verdictConfig:Record<string,{color:string;bg:string;label:string}> = {
-    send_it:    {color:C.green,  bg:C.greenLo,  label:'Send it'},
-    needs_work: {color:C.gold,   bg:C.goldLo,   label:'Needs work'},
-    dont_send:  {color:C.red,    bg:C.redLo,    label:"Don't send"},
-  };
-  const vc = result ? (verdictConfig[result.verdict]??verdictConfig.needs_work) : null;
-
-  return(
-    <div style={{background:C.surface,border:`1px solid ${C.violetHi}`,borderRadius:20,overflow:'hidden',marginTop:12}}>
-      {/* Header */}
-      <div style={{padding:'16px 20px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
-        <motion.div animate={{opacity:[1,0.4,1]}} transition={{duration:2,repeat:Infinity}}
-          style={{width:7,height:7,borderRadius:'50%',background:C.violetBr,flexShrink:0}}/>
-        <div>
-          <div style={{fontSize:12,fontWeight:700,color:C.text,fontFamily:"'DM Sans',sans-serif"}}>AI Live Coach</div>
-          <div style={{fontSize:10,color:C.muted,marginTop:1}}>Paste what you're about to send</div>
+function LoadingView() {
+  const [idx, setIdx] = useState(0);
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const t1 = setInterval(() => setIdx(i => Math.min(i + 1, LOAD_LINES.length - 1)), 2200);
+    const t2 = setInterval(() => setPct(p => Math.min(p + Math.random() * 5 + 2, 91)), 400);
+    return () => { clearInterval(t1); clearInterval(t2); };
+  }, []);
+  return (
+    <div style={{ textAlign: 'center', padding: '80px 0 100px' }}>
+      <div style={{ position: 'relative', width: 80, height: 80, margin: '0 auto 40px' }}>
+        <motion.div animate={{ rotate: 360 }} transition={{ type: 'tween', repeat: Infinity, duration: 3, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2.5px solid transparent', borderTopColor: C.ink, borderRightColor: `${C.ink}25` }} />
+        <motion.div animate={{ rotate: -360 }} transition={{ type: 'tween', repeat: Infinity, duration: 2, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 13, borderRadius: '50%', border: '2px solid transparent', borderTopColor: C.red, borderRightColor: `${C.red}25` }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.div style={{ width: 10, height: 10, borderRadius: '50%', background: C.red }}
+            animate={{ opacity: [1, 0.3, 1], scale: [1, 0.7, 1] }}
+            transition={{ type: 'tween', duration: 1.6, repeat: Infinity, ease: 'easeInOut' }} />
         </div>
       </div>
+      <AnimatePresence mode="wait">
+        <motion.p key={idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.32 }}
+          style={{ fontSize: 17, color: C.muted, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, marginBottom: 36, height: 28 }}>
+          {LOAD_LINES[idx]}
+        </motion.p>
+      </AnimatePresence>
+      <div style={{ maxWidth: 280, margin: '0 auto', height: 3, background: C.warm2, borderRadius: 99, overflow: 'hidden' }}>
+        <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.5, ease: 'easeOut' }}
+          style={{ height: '100%', background: C.ink, borderRadius: 99 }} />
+      </div>
+      <p style={{ fontSize: 13.5, color: C.mutedLt, marginTop: 18, fontFamily: "'DM Sans', sans-serif" }}>Takes 15–30 seconds</p>
+    </div>
+  );
+}
 
-      <div style={{padding:'16px 18px'}}>
-        <div style={{position:'relative',marginBottom:10}}>
-          <textarea value={draft} onChange={e=>setDraft(e.target.value)}
-            placeholder='Type what you want to send…'
-            onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))runCoach();}}
-            style={{width:'100%',minHeight:80,background:'rgba(255,255,255,0.03)',
-              border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 14px',
-              color:C.text,fontSize:13,lineHeight:1.6,fontFamily:"'DM Sans',sans-serif",
-              resize:'none',outline:'none',boxSizing:'border-box',transition:'border-color 0.2s'}}
-            onFocus={e=>e.currentTarget.style.borderColor=C.violetHi}
-            onBlur={e=>e.currentTarget.style.borderColor=C.border}/>
+// ─── LIVE COACH ───────────────────────────────────────────────────────────────
+function LiveCoach({ extractedText, context }: { extractedText: string; context: string }) {
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [res, setRes] = useState<CoachResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async () => {
+    if (!draft.trim() || loading) return;
+    setLoading(true); setRes(null); setErr(null);
+    try {
+      const r = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftMessage: draft, conversationHistory: extractedText, context }) });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error || 'Failed');
+      setRes(d);
+    } catch (e: any) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const vs: Record<string, { color: string; bg: string; text: string }> = {
+    send_it:    { color: C.green,  bg: 'rgba(45,138,78,0.1)',   text: '✓ Send it'    },
+    needs_work: { color: C.amber,  bg: `${C.amber}15`,           text: '⚠ Needs work' },
+    dont_send:  { color: C.red,    bg: `${C.red}10`,             text: "✗ Don't send" },
+  };
+  const v = res ? (vs[res.verdict] ?? vs.needs_work) : null;
+
+  return (
+    <div style={{ background: C.ink, border: `1.5px solid rgba(243,237,226,0.1)`, borderRadius: 18, overflow: 'hidden' }}>
+      <div style={{ padding: '18px 22px 16px', borderBottom: `1px solid rgba(243,237,226,0.07)`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ type: 'tween', duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ width: 8, height: 8, borderRadius: '50%', background: C.red, flexShrink: 0 }} />
+        <div>
+          <p style={{ fontSize: 15, fontWeight: 800, color: C.cream, fontFamily: "'Bricolage Grotesque', sans-serif", margin: 0 }}>AI Live Coach</p>
+          <p style={{ fontSize: 12.5, color: `${C.cream}45`, margin: '2px 0 0', fontFamily: "'DM Sans', sans-serif" }}>Type what you're about to send — get instant feedback</p>
         </div>
-        <motion.button onClick={runCoach}
-          disabled={!draft.trim()||loading}
-          whileHover={draft.trim()&&!loading?{scale:1.02}:{}}
-          whileTap={draft.trim()&&!loading?{scale:0.98}:{}}
-          style={{width:'100%',padding:'11px',borderRadius:10,border:'none',
-            background:draft.trim()&&!loading?C.violetLo:'rgba(255,255,255,0.04)',
-            border:`1px solid ${draft.trim()&&!loading?C.violetHi:C.border}`,
-            color:draft.trim()&&!loading?C.violetBr:C.muted,
-            fontSize:12,fontWeight:600,cursor:draft.trim()&&!loading?'pointer':'not-allowed',
-            fontFamily:"'DM Sans',sans-serif",transition:'all 0.2s',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-          {loading?(
-            <><motion.div animate={{rotate:360}} transition={{repeat:Infinity,duration:0.8,ease:'linear'}}
-              style={{width:13,height:13,borderRadius:'50%',border:`1.5px solid ${C.violetBr}`,borderTopColor:'transparent'}}/>
-            Coaching…</>
-          ):<>Coach this message <span style={{fontSize:10,opacity:0.6}}>⌘↵</span></>}
+      </div>
+      <div style={{ padding: '18px 20px' }}>
+        <textarea value={draft} onChange={e => setDraft(e.target.value)}
+          placeholder="Type your draft message here…"
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run(); }}
+          style={{ width: '100%', minHeight: 100, background: 'rgba(243,237,226,0.05)', border: `1.5px solid rgba(243,237,226,0.12)`, borderRadius: 12, padding: '13px 16px', color: C.cream, fontSize: 14.5, lineHeight: 1.7, fontFamily: "'DM Sans', sans-serif", resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: 12, transition: 'border-color 0.2s' }}
+          onFocus={e => e.currentTarget.style.borderColor = 'rgba(243,237,226,0.3)'}
+          onBlur={e => e.currentTarget.style.borderColor = 'rgba(243,237,226,0.12)'} />
+        <motion.button onClick={run} disabled={!draft.trim() || loading}
+          whileHover={draft.trim() && !loading ? { scale: 1.015 } : {}}
+          whileTap={draft.trim() && !loading ? { scale: 0.985 } : {}}
+          style={{ width: '100%', padding: '14px', borderRadius: 11, border: 'none', background: draft.trim() && !loading ? C.red : 'rgba(243,237,226,0.07)', color: draft.trim() && !loading ? '#fff' : `${C.cream}30`, fontSize: 14.5, fontWeight: 800, cursor: draft.trim() && !loading ? 'pointer' : 'default', fontFamily: "'Bricolage Grotesque', sans-serif", transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          {loading ? (
+            <><motion.div animate={{ rotate: 360 }} transition={{ type: 'tween', repeat: Infinity, duration: 0.8, ease: 'linear' }}
+              style={{ width: 15, height: 15, borderRadius: '50%', border: `2px solid rgba(255,255,255,0.3)`, borderTopColor: '#fff' }} />Coaching…</>
+          ) : 'Coach this message'}
         </motion.button>
-
-        {error&&<div style={{fontSize:12,color:C.red,marginTop:10,padding:'8px 12px',background:C.redLo,borderRadius:8}}>{error}</div>}
-
+        {err && <p style={{ fontSize: 13.5, color: C.red, marginTop: 12, padding: '11px 14px', background: `${C.red}10`, borderRadius: 10, fontFamily: "'DM Sans', sans-serif", border: `1px solid ${C.red}25` }}>{err}</p>}
         <AnimatePresence>
-          {result&&vc&&(
-            <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={EO}
-              style={{marginTop:14,display:'flex',flexDirection:'column',gap:10}}>
-
-              {/* Verdict */}
-              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-                <span style={{fontSize:13,fontWeight:700,padding:'5px 13px',borderRadius:8,background:vc.bg,color:vc.color,fontFamily:"'DM Sans',sans-serif"}}>{vc.label}</span>
-                <span style={{fontSize:12,color:C.muted2,fontStyle:'italic',fontFamily:"'Instrument Serif',serif"}}>{result.verdictLabel}</span>
+          {res && v && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease }} style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, fontWeight: 800, padding: '6px 16px', borderRadius: 9, background: v.bg, color: v.color, fontFamily: "'Bricolage Grotesque', sans-serif", border: `1px solid ${v.color}30` }}>{v.text}</span>
+                <span style={{ fontSize: 14, color: `${C.cream}55`, fontStyle: 'italic', fontFamily: "'DM Sans', sans-serif" }}>{res.verdictLabel}</span>
               </div>
-
-              {/* Analysis */}
-              <p style={{fontSize:13,color:C.muted2,lineHeight:1.7,margin:0}}>{result.analysis}</p>
-
-              {/* Improved version */}
-              <div style={{background:'rgba(91,79,233,0.08)',border:`1px solid ${C.violetHi}`,borderRadius:12,padding:'12px 14px'}}>
-                <div style={{fontSize:9,color:C.violetBr,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700,marginBottom:6}}>Send this instead</div>
-                <p style={{fontSize:14,color:C.text,lineHeight:1.65,margin:'0 0 8px',fontFamily:"'Instrument Serif',serif",fontStyle:'italic'}}>"{result.improvedVersion}"</p>
-                <p style={{fontSize:11,color:C.muted,margin:0,lineHeight:1.5}}>{result.whyItsBetter}</p>
+              <p style={{ fontSize: 14.5, color: `${C.cream}65`, lineHeight: 1.8, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{res.analysis}</p>
+              <div style={{ background: 'rgba(243,237,226,0.05)', border: `1.5px solid rgba(243,237,226,0.12)`, borderRadius: 14, padding: '16px 18px' }}>
+                <p style={{ fontSize: 10.5, fontWeight: 800, color: `${C.cream}40`, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 10px', fontFamily: 'monospace' }}>Send this instead</p>
+                <p style={{ fontSize: 16, color: C.cream, lineHeight: 1.7, margin: '0 0 10px', fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>"{res.improvedVersion}"</p>
+                <p style={{ fontSize: 13.5, color: `${C.cream}45`, margin: 0, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif" }}>{res.whyItsBetter}</p>
               </div>
-
-              {/* Flags */}
-              {result.flags?.length>0&&(
-                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                  {result.flags.map((f,i)=>(
-                    <span key={i} style={{fontSize:9,fontWeight:600,padding:'3px 8px',borderRadius:5,
-                      background:f.startsWith('good')||f==='confident'||f==='builds_tension'?C.greenLo:C.redLo,
-                      color:f.startsWith('good')||f==='confident'||f==='builds_tension'?C.green:C.red,
-                      textTransform:'uppercase',letterSpacing:'0.06em',fontFamily:"'DM Sans',sans-serif"}}>
-                      {f.replace(/_/g,' ')}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Quick tips */}
-              {result.quickTips?.length>0&&(
-                <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                  {result.quickTips.map((tip,i)=>(
-                    <div key={i} style={{display:'flex',gap:8,alignItems:'flex-start'}}>
-                      <div style={{width:4,height:4,borderRadius:'50%',background:C.violetBr,marginTop:6,flexShrink:0}}/>
-                      <span style={{fontSize:12,color:C.muted2,lineHeight:1.5}}>{tip}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -459,477 +553,558 @@ function LiveCoach({extractedText,context}:{extractedText:string;context:string}
     </div>
   );
 }
-// ──────────────────────────────────────────────────────────────────────────────
-// LOADING STATE
-// ──────────────────────────────────────────────────────────────────────────────
-const LOADING_LINES = [
-  'Reading your conversation…',
-  'Identifying message patterns…',
-  'Analyzing power dynamics…',
-  'Detecting psychological signals…',
-  'Measuring attraction signals…',
-  'Checking what was missed…',
-  'Crafting your 10-layer report…',
-];
 
-function Loading() {
-  const [idx,setIdx]=useState(0);
-  const [pct,setPct]=useState(0);
-  useEffect(()=>{
-    const t1=setInterval(()=>setIdx(i=>Math.min(i+1,LOADING_LINES.length-1)),1900);
-    const t2=setInterval(()=>setPct(p=>Math.min(p+Math.random()*6+2,93)),350);
-    return()=>{clearInterval(t1);clearInterval(t2);};
-  },[]);
-  return(
-    <div style={{textAlign:'center',padding:'70px 0'}}>
-      <div style={{position:'relative',width:72,height:72,margin:'0 auto 24px'}}>
-        <motion.div animate={{rotate:360}} transition={{repeat:Infinity,duration:2.8,ease:'linear'}}
-          style={{position:'absolute',inset:0,borderRadius:'50%',border:'2px solid transparent',borderTopColor:C.violetBr,borderRightColor:`${C.violetBr}35`}}/>
-        <motion.div animate={{rotate:-360}} transition={{repeat:Infinity,duration:1.9,ease:'linear'}}
-          style={{position:'absolute',inset:10,borderRadius:'50%',border:'1.5px solid transparent',borderTopColor:C.pink,borderRightColor:`${C.pink}30`}}/>
-        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <motion.div style={{width:10,height:10,borderRadius:'50%',background:C.violetBr}}
-            animate={{opacity:[1,0.3,1],scale:[1,0.75,1]}} transition={{duration:1.4,repeat:Infinity}}/>
-        </div>
+// ─── CHAT REPLAY ──────────────────────────────────────────────────────────────
+function ChatReplay({ extractedText }: { extractedText: string }) {
+  const [open, setOpen] = useState(false);
+  const msgs: Array<{ who: 'me' | 'them'; text: string }> = extractedText.split('\n').filter(l => l.trim()).map(line => {
+    if (/^(user|me|you):/i.test(line)) return { who: 'me' as const, text: line.replace(/^(user|me|you):\s*/i, '').trim() };
+    if (/^(them|her|him|they|she|he):/i.test(line)) return { who: 'them' as const, text: line.replace(/^(them|her|him|they|she|he):\s*/i, '').trim() };
+    return null;
+  }).filter(Boolean) as Array<{ who: 'me' | 'them'; text: string }>;
+  if (msgs.length === 0) return null;
+  const show = open ? msgs : msgs.slice(-8);
+  return (
+    <Section title="Chat Preview" accent={C.teal} badge={<Pill label={`${msgs.length} msgs`} color={C.teal} bg="rgba(58,122,138,0.12)" />}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14 }}>
+        {!open && msgs.length > 8 && (
+          <button onClick={() => setOpen(true)} style={{ background: 'none', border: 'none', color: C.red, fontSize: 13.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 700, textAlign: 'left', padding: '0 0 6px' }}>
+            ↑ Show all {msgs.length} messages
+          </button>
+        )}
+        {show.map((m, i) => (
+          <motion.div key={i} initial={{ opacity: 0, x: m.who === 'me' ? 10 : -10 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.03, ...sp }}
+            style={{ display: 'flex', justifyContent: m.who === 'me' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              maxWidth: '78%', padding: '9px 14px', fontSize: 13.5, lineHeight: 1.6,
+              borderRadius: m.who === 'me' ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
+              background: m.who === 'me' ? C.ink : C.warm1,
+              border: `1px solid ${m.who === 'me' ? 'transparent' : C.warm2}`,
+              color: m.who === 'me' ? C.cream : C.ink,
+              fontFamily: "'DM Sans', sans-serif",
+            }}>{m.text}</div>
+          </motion.div>
+        ))}
+        {open && (
+          <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textAlign: 'center', paddingTop: 6 }}>
+            ↑ Collapse
+          </button>
+        )}
       </div>
-      <AnimatePresence mode="wait">
-        <motion.p key={idx} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
-          transition={{duration:0.3}} style={{fontSize:13,color:C.muted2,marginBottom:24,fontFamily:"'DM Sans',sans-serif",height:18}}>
-          {LOADING_LINES[idx]}
-        </motion.p>
-      </AnimatePresence>
-      <div style={{maxWidth:240,margin:'0 auto',height:2,background:'rgba(255,255,255,0.07)',borderRadius:99,overflow:'hidden'}}>
-        <motion.div style={{height:'100%',background:`linear-gradient(90deg,${C.violet},${C.violetBr})`,borderRadius:99}}
-          animate={{width:`${pct}%`}} transition={{duration:0.45,ease:'easeOut'}}/>
+    </Section>
+  );
+}
+
+// ─── SHARE CARD ───────────────────────────────────────────────────────────────
+function ShareCard({ result }: { result: AnalysisResult }) {
+  const [copied, setCopied] = useState(false);
+  const sc = result.overallScore;
+  const scColor = sc >= 7 ? C.green : sc >= 5 ? C.amber : C.red;
+
+  const copy = async () => {
+    const t = `ConvoCoach Analysis\nScore: ${sc.toFixed(1)}/10\nInterest: ${result.interestLevel}% | Attraction: ${result.attractionProbability}%\nMomentum: ${result.conversationMomentum}\n"${result.layer1_diagnosis?.verdict || ''}"`;
+    await navigator.clipboard.writeText(t).catch(() => {});
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div style={{ background: C.ink, borderRadius: 20, padding: '28px', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${scColor}20, transparent 70%)`, pointerEvents: 'none' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+        <p style={{ fontSize: 10.5, fontWeight: 800, color: `${C.cream}35`, textTransform: 'uppercase', letterSpacing: '0.14em', margin: 0, fontFamily: 'monospace' }}>Your Score Card</p>
+        <motion.button onClick={copy} whileTap={{ scale: 0.97 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, background: copied ? 'rgba(45,138,78,0.15)' : 'rgba(243,237,226,0.07)', border: `1px solid ${copied ? 'rgba(45,138,78,0.3)' : 'rgba(243,237,226,0.12)'}`, borderRadius: 9, padding: '8px 16px', color: copied ? C.green : `${C.cream}60`, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.25s' }}>
+          {copied ? '✓ Copied!' : '⎘ Share'}
+        </motion.button>
       </div>
-      <p style={{fontSize:11,color:C.muted,marginTop:16}}>Deep analysis takes 15–30 seconds</p>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(72px, 15vw, 100px)', fontWeight: 900, color: scColor, lineHeight: 1, letterSpacing: '-0.05em' }}>{sc.toFixed(1)}</span>
+        <span style={{ fontSize: 26, color: `${C.cream}30`, marginBottom: 8, fontFamily: "'Bricolage Grotesque', sans-serif" }}>/10</span>
+      </div>
+      {result.layer1_diagnosis?.verdict && (
+        <p style={{ fontSize: 15.5, color: `${C.cream}60`, fontStyle: 'italic', lineHeight: 1.7, margin: '0 0 22px', fontFamily: 'Georgia, serif' }}>"{result.layer1_diagnosis.verdict}"</p>
+      )}
+      <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Their Interest',   val: `${result.interestLevel}%`,           color: '#A0426E' },
+          { label: 'Attraction',       val: `${result.attractionProbability}%`,   color: C.amber },
+          { label: 'Momentum',         val: result.conversationMomentum,          color: result.conversationMomentum === 'escalating' ? C.green : result.conversationMomentum === 'dying' ? C.red : C.amber },
+        ].map(m => (
+          <div key={m.label}>
+            <p style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 22, fontWeight: 900, color: m.color, margin: '0 0 4px', textTransform: 'capitalize', letterSpacing: '-0.02em' }}>{m.val}</p>
+            <p style={{ fontSize: 10.5, color: `${C.cream}35`, textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, fontFamily: 'monospace' }}>{m.label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// RESULTS — full 10-layer display
-// ──────────────────────────────────────────────────────────────────────────────
-function StepResults({result,context,onReset}:{result:AnalysisResult;context:string;onReset:()=>void}){
-  const [activeTab,setActiveTab]=useState<'analysis'|'rewrites'|'coach'>('analysis');
-  const ctxObj=CONTEXTS.find(c=>c.id===context)!;
-  const sc=result.overallScore;
-  const scColor=sc>=7?C.green:sc>=5?C.gold:C.red;
-  const stageCfg=STAGE_CFG[result.layer1_diagnosis.stage]??STAGE_CFG.neutral;
-  const mom=MOM[result.conversationMomentum]??MOM.neutral;
-  const langName=LANG_NAMES[result.detectedLanguage]??result.detectedLanguage;
+// ─── FLAG GRID ────────────────────────────────────────────────────────────────
+function FlagGrid({ result }: { result: AnalysisResult }) {
+  const g: string[] = []; const r: string[] = [];
+  result.layer8_attractionSignals?.forEach(s => { if (s.type === 'positive') g.push(s.signal); if (s.type === 'negative') r.push(s.signal); });
+  result.layer5_mistakes?.filter(m => m.severity === 'high').forEach(m => r.push(m.mistake));
+  if (result.replyEnergyMatch === 'matched') g.push('Energy matched');
+  if (result.replyEnergyMatch === 'low') r.push('Low energy replies');
+  if (result.conversationMomentum === 'escalating') g.push('Rising momentum');
+  if (result.conversationMomentum === 'dying') r.push('Momentum dying');
+  result.layer3_psychSignals?.filter(s => s.detected).slice(0, 2).forEach(s => g.push(s.signal));
 
-  return(
-    <div>
-      {/* Back + meta row */}
-      <Reveal>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18,flexWrap:'wrap',gap:10}}>
-          <button onClick={onReset} style={{display:'inline-flex',alignItems:'center',gap:6,background:'none',border:'none',color:C.muted,fontSize:12,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",padding:0}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 7H2M5.5 3L2 7l3.5 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  return (
+    <Section title="Signal Flags" accent={result.overallScore >= 6 ? C.green : C.red}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, paddingTop: 16 }}>
+        {[{ label: 'Green', color: C.green, items: g }, { label: 'Red', color: C.red, items: r }].map(col => (
+          <div key={col.label}>
+            <p style={{ fontSize: 10.5, fontWeight: 800, color: col.color, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 14px', fontFamily: 'monospace' }}>
+              {col.label} ({col.items.length})
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {col.items.slice(0, 6).map((f, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: col.color, marginTop: 6, flexShrink: 0, display: 'block' }} />
+                  <p style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.55, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{f}</p>
+                </div>
+              ))}
+              {col.items.length === 0 && <p style={{ fontSize: 13.5, color: C.mutedLt, fontStyle: 'italic', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>None detected</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+// ─── RESULTS VIEW ─────────────────────────────────────────────────────────────
+const STAGE_MAP: Record<string, { label: string; color: string }> = {
+  early_interest: { label: 'Early Interest', color: C.teal },
+  flirting:       { label: 'Flirting',       color: '#A0426E' },
+  escalating:     { label: 'Escalating',     color: C.green },
+  neutral:        { label: 'Neutral',        color: C.muted },
+  fading:         { label: 'Fading',         color: C.red },
+  reconnecting:   { label: 'Reconnecting',   color: C.amber },
+  professional:   { label: 'Professional',   color: C.teal },
+  platonic:       { label: 'Platonic',       color: C.muted },
+};
+const MOM_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  escalating: { label: '↑ Rising', color: C.green, bg: 'rgba(45,138,78,0.12)' },
+  neutral:    { label: '→ Neutral', color: C.amber, bg: `${C.amber}15` },
+  dying:      { label: '↓ Fading', color: C.red,   bg: `${C.red}10` },
+};
+const SEV_C: Record<string, string> = { high: C.red, medium: C.amber, low: C.muted };
+const SIG_C: Record<string, string> = { positive: C.green, negative: C.red, neutral: C.muted };
+const SCORES = [
+  { key: 'attraction',           label: 'Attraction',      color: '#A0426E' },
+  { key: 'interestLevel',        label: 'Interest',        color: C.red },
+  { key: 'engagement',           label: 'Engagement',      color: C.green },
+  { key: 'curiosity',            label: 'Curiosity',       color: C.teal },
+  { key: 'confidence',           label: 'Confidence',      color: C.amber },
+  { key: 'humor',                label: 'Humor',           color: '#B85C2A' },
+  { key: 'emotionalConnection',  label: 'Emotional Bond',  color: '#A0426E' },
+  { key: 'conversationalMomentum', label: 'Momentum',      color: C.green },
+];
+
+function ResultsView({ result, context, onReset }: { result: AnalysisResult; context: string; onReset: () => void }) {
+  const [tab, setTab] = useState<'analysis' | 'rewrites' | 'coach'>('analysis');
+  const ctx = CONTEXTS.find(c => c.id === context)!;
+  const sc = result.overallScore;
+  const scColor = sc >= 7 ? C.green : sc >= 5 ? C.amber : C.red;
+  const stage = STAGE_MAP[result.layer1_diagnosis?.stage] ?? STAGE_MAP.neutral;
+  const mom = MOM_MAP[result.conversationMomentum] ?? MOM_MAP.neutral;
+  const lang = LANG_MAP[result.detectedLanguage] ?? result.detectedLanguage;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Fade>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <button onClick={onReset} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: C.muted, fontSize: 13.5, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, padding: 0 }}>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 7.5H3M6 3.5L3 7.5l3 4" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             New analysis
           </button>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            <Tag label={ctxObj.label} color={ctxObj.color} bg={`${ctxObj.color}15`}/>
-            <Tag label={langName} color={C.muted2} bg="rgba(255,255,255,0.06)"/>
-            <Tag label={result.inputMode==='screenshot'?'Screenshot':'Text'} color={C.muted2} bg="rgba(255,255,255,0.06)"/>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            <Pill label={ctx.label} color={ctx.color} bg={`${ctx.color}12`} />
+            <Pill label={lang} color={C.muted} bg={`${C.muted}12`} />
           </div>
         </div>
-      </Reveal>
+      </Fade>
 
-      {/* Hero — score + verdict */}
-      <Reveal delay={0.04}>
-        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:22,padding:'24px 22px',marginBottom:10,position:'relative',overflow:'hidden'}}>
-          <div style={{position:'absolute',right:-10,top:-12,fontSize:130,fontWeight:800,color:scColor,opacity:0.03,lineHeight:1,pointerEvents:'none',userSelect:'none',fontFamily:"'Instrument Serif',serif",fontStyle:'italic'}}>{Math.round(sc)}</div>
-          <div style={{display:'flex',alignItems:'flex-start',gap:18,flexWrap:'wrap',position:'relative',zIndex:1}}>
-            <div style={{flex:'1 1 180px'}}>
-              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:600,marginBottom:6}}>Overall Score</div>
-              <div style={{display:'flex',alignItems:'baseline',gap:5,marginBottom:10}}>
-                <span style={{fontSize:48,fontWeight:700,color:scColor,lineHeight:1,fontFamily:"'DM Sans',sans-serif"}}>{sc.toFixed(1)}</span>
-                <span style={{fontSize:18,color:C.muted}}>/10</span>
+      {/* Hero — ink bg like other dramatic sections */}
+      <Fade delay={0.05}>
+        <div style={{ background: C.ink, borderRadius: 22, padding: 'clamp(24px, 5vw, 40px)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', right: -50, top: -50, width: 260, height: 260, borderRadius: '50%', background: `radial-gradient(circle, ${scColor}15, transparent 65%)`, pointerEvents: 'none' }} />
+          <p style={{ fontSize: 10.5, fontWeight: 800, color: `${C.cream}30`, textTransform: 'uppercase', letterSpacing: '0.14em', margin: '0 0 18px', fontFamily: 'monospace' }}>Conversation Score</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap', marginBottom: 22 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
+                <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(80px, 16vw, 108px)', fontWeight: 900, color: scColor, lineHeight: 1, letterSpacing: '-0.05em' }}>
+                  {sc.toFixed(1)}
+                </span>
+                <span style={{ fontSize: 30, color: `${C.cream}25`, fontFamily: "'Bricolage Grotesque', sans-serif" }}>/10</span>
               </div>
-              <p style={{fontSize:13,fontFamily:"'Instrument Serif',serif",fontStyle:'italic',color:C.muted2,lineHeight:1.65,margin:'0 0 14px'}}>{result.layer1_diagnosis.verdict}</p>
-              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                <Tag label={stageCfg.label} color={stageCfg.color} bg={`${stageCfg.color}15`}/>
-                <Tag label={mom.label}      color={mom.color}      bg={`${mom.color}15`}/>
-                {result.replyEnergyMatch==='low'&&<Tag label="Low energy" color={C.red} bg={C.redLo}/>}
-                {result.replyEnergyMatch==='high'&&<Tag label="Over-investing" color={C.gold} bg={C.goldLo}/>}
-              </div>
+              <p style={{ fontSize: 17, color: `${C.cream}60`, fontStyle: 'italic', lineHeight: 1.65, margin: 0, maxWidth: 360, fontFamily: 'Georgia, serif' }}>
+                {result.layer1_diagnosis?.verdict}
+              </p>
             </div>
-            <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-start'}}>
-              {[{val:result.interestLevel,max:100,color:C.pink,label:'Their interest',size:70},
-                {val:result.attractionProbability,max:100,color:C.gold,label:'Attraction',size:70}].map(r=>{
-                const rad=r.size/2-7,circ=2*Math.PI*rad;
-                return(
-                  <div key={r.label} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
-                    <div style={{position:'relative',width:r.size,height:r.size}}>
-                      <svg width={r.size} height={r.size} style={{transform:'rotate(-90deg)'}}>
-                        <circle cx={r.size/2} cy={r.size/2} r={rad} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4}/>
-                        <motion.circle cx={r.size/2} cy={r.size/2} r={rad} fill="none" stroke={r.color} strokeWidth={4} strokeLinecap="round"
-                          initial={{strokeDasharray:`0 ${circ}`}} animate={{strokeDasharray:`${(r.val/r.max)*circ} ${circ}`}}
-                          transition={{duration:1.4,ease:[0.16,1,0.3,1],delay:0.2}}/>
-                      </svg>
-                      <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <span style={{fontSize:13,fontWeight:700,color:r.color,fontFamily:"'DM Sans',sans-serif"}}>{r.val}</span>
-                      </div>
-                    </div>
-                    <span style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.09em',fontFamily:"'DM Sans',sans-serif",textAlign:'center'}}>{r.label}</span>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', gap: 24, flexShrink: 0, alignItems: 'center' }}>
+              <Ring value={result.interestLevel} max={100} color="#A0426E" size={96} label="Their Interest" />
+              <Ring value={result.attractionProbability} max={100} color={C.amber} size={96} label="Attraction" />
             </div>
           </div>
-        </div>
-      </Reveal>
-
-      {/* Diagnosis */}
-      <Reveal delay={0.08}>
-        <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-          <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:10}}>Diagnosis</div>
-          <p style={{fontSize:14,color:C.text,lineHeight:1.75,margin:'0 0 12px'}}>{result.layer1_diagnosis.summary}</p>
-          {result.tags.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:6}}>{result.tags.map((t,i)=><Tag key={i} label={t.replace(/-/g,' ')} color={C.violetBr} bg={C.violetLo}/>)}</div>}
-        </div>
-      </Reveal>
-
-      {/* Roast */}
-      {result.roastMode&&result.roastText&&(
-        <Reveal delay={0.10}>
-          <div style={{background:C.redLo,border:`1px solid ${C.red}30`,borderRadius:18,padding:'18px 20px',marginBottom:10,position:'relative',overflow:'hidden'}}>
-            <div style={{position:'absolute',top:-10,right:14,fontSize:72,opacity:0.06,lineHeight:1,pointerEvents:'none',userSelect:'none',fontFamily:"'Instrument Serif',serif"}}>"</div>
-            <div style={{fontSize:9,color:C.red,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:8}}>Roast</div>
-            <p style={{fontSize:14,color:C.text,lineHeight:1.75,fontFamily:"'Instrument Serif',serif",fontStyle:'italic',margin:0}}>{result.roastText}</p>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            <Pill label={stage.label} color={stage.color} bg={`${stage.color}18`} />
+            <Pill label={mom.label} color={mom.color} bg={mom.bg} />
+            {result.roastMode && <Pill label="🔥 Roast" color={C.red} bg={`${C.red}15`} />}
+            {result.replyEnergyMatch === 'low' && <Pill label="Low energy" color={C.red} bg={`${C.red}12`} />}
+            {result.replyEnergyMatch === 'high' && <Pill label="Over-investing" color={C.amber} bg={`${C.amber}12`} />}
+            {result.tags?.slice(0, 3).map((t, i) => <Pill key={i} label={t.replace(/-/g, ' ')} color={C.muted} bg={`${C.muted}12`} />)}
           </div>
-        </Reveal>
+        </div>
+      </Fade>
+
+      <Fade delay={0.08}><ShareCard result={result} /></Fade>
+
+      {/* Diagnosis card — cream */}
+      <Fade delay={0.10}>
+        <div style={{ background: C.cream, border: `1.5px solid ${C.warm2}`, borderRadius: 18, padding: '24px 24px' }}>
+          <span style={{ ...LABEL, marginBottom: 14 }}>Diagnosis</span>
+          <p style={{ fontSize: 16, color: C.ink, lineHeight: 1.85, margin: '0 0 20px', fontFamily: "'DM Sans', sans-serif" }}>
+            {result.layer1_diagnosis?.summary}
+          </p>
+          {result.layer10_strategy?.primaryAdvice && (
+            <div style={{ background: C.warm1, borderLeft: `3px solid ${C.red}`, borderRadius: '0 12px 12px 0', padding: '14px 18px' }}>
+              <p style={{ fontSize: 15, color: C.ink, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                {result.layer10_strategy.primaryAdvice}
+              </p>
+            </div>
+          )}
+        </div>
+      </Fade>
+
+      {/* Roast — ink bg */}
+      {result.roastMode && result.roastText && (
+        <Fade delay={0.11}>
+          <div style={{ background: C.ink, border: `1.5px solid ${C.red}25`, borderRadius: 18, padding: '24px' }}>
+            <span style={{ ...LABEL, marginBottom: 14 }}>🔥 The Roast</span>
+            <p style={{ fontSize: 17, color: `${C.cream}85`, lineHeight: 1.85, fontStyle: 'italic', margin: 0, fontFamily: 'Georgia, serif' }}>
+              {result.roastText}
+            </p>
+          </div>
+        </Fade>
       )}
 
-      {/* Tab bar */}
-      <Reveal delay={0.12}>
-        <div style={{display:'flex',background:C.surface,borderRadius:12,padding:3,marginBottom:12,border:`1px solid ${C.border}`,gap:3}}>
-          {([['analysis','Analysis'],['rewrites','Rewrites & Moves'],['coach','Live Coach']] as const).map(([t,label])=>(
-            <button key={t} onClick={()=>setActiveTab(t)}
-              style={{flex:1,padding:'9px 8px',borderRadius:9,border:'none',cursor:'pointer',
-                background:activeTab===t?C.surfaceHi:'transparent',
-                color:activeTab===t?C.text:C.muted,
-                fontSize:11,fontWeight:600,fontFamily:"'DM Sans',sans-serif",
-                textTransform:'uppercase',letterSpacing:'0.08em',transition:'all 0.2s',
-                borderBottom:activeTab===t?`2px solid ${C.violetBr}`:'2px solid transparent'}}>
-              {label}
+      <Fade delay={0.12}><FlagGrid result={result} /></Fade>
+      <Fade delay={0.13}><ChatReplay extractedText={result.extractedText} /></Fade>
+
+      {/* Tabs */}
+      <Fade delay={0.14}>
+        <div style={{ display: 'flex', background: C.warm1, borderRadius: 13, padding: 4, border: `1.5px solid ${C.warm2}`, gap: 4 }}>
+          {(['analysis', 'rewrites', 'coach'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '12px 8px', borderRadius: 9, border: 'none', cursor: 'pointer',
+              background: tab === t ? C.ink : 'transparent',
+              color: tab === t ? C.cream : C.muted,
+              fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s',
+            }}>
+              {t === 'analysis' ? 'Analysis' : t === 'rewrites' ? 'Rewrites' : 'Live Coach'}
             </button>
           ))}
         </div>
-      </Reveal>
+      </Fade>
 
       <AnimatePresence mode="wait">
-        {/* ── ANALYSIS TAB ── */}
-        {activeTab==='analysis'&&(
-          <motion.div key="analysis" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={EO}>
+        {tab === 'analysis' && (
+          <motion.div key="a" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Layer 2 — Scores */}
-            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:16}}>Score Breakdown</div>
-              <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                {SCORE_META.map((sm,i)=>{
-                  const s=result.layer2_scores[sm.key];
-                  if(!s)return null;
-                  return(
+            <Section title="Score Breakdown" accent={C.red} defaultOpen>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingTop: 16 }}>
+                {SCORES.map((sm, i) => {
+                  const s = result.layer2_scores?.[sm.key];
+                  if (!s) return null;
+                  return (
                     <div key={sm.key}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-                        <span style={{fontSize:12,fontWeight:600,color:C.text}}>{sm.label}</span>
-                        <span style={{fontSize:16,fontWeight:700,color:sm.color,fontFamily:"'DM Sans',sans-serif",lineHeight:1}}>{s.score.toFixed(1)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <span style={{ fontSize: 14.5, fontWeight: 700, color: C.ink, fontFamily: "'DM Sans', sans-serif" }}>{sm.label}</span>
+                        <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 22, fontWeight: 900, color: sm.color, lineHeight: 1 }}>{s.score.toFixed(1)}</span>
                       </div>
-                      <ScoreBar val={s.score} color={sm.color} delay={0.05+i*0.06}/>
-                      {s.explanation&&<p style={{fontSize:12,color:C.muted,lineHeight:1.6,margin:'7px 0 0'}}>{s.explanation}</p>}
+                      <AnimBar pct={(s.score / 10) * 100} color={sm.color} delay={0.04 + i * 0.07} />
+                      {s.explanation && <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: '10px 0 0', fontFamily: "'DM Sans', sans-serif" }}>{s.explanation}</p>}
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </Section>
 
-            {/* Layer 4 — Power dynamics */}
-            {result.layer4_powerDynamics?.analysis&&(
-              <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:12}}>Power Dynamics</div>
-                <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-                  {[{label:'Power',val:result.layer4_powerDynamics.whoHoldsPower},
-                    {label:'Chasing',val:result.layer4_powerDynamics.whoIsChasing},
-                    {label:'Leading',val:result.layer4_powerDynamics.whoIsLeading}].map(item=>(
-                    <div key={item.label} style={{flex:'1 1 80px',background:C.surfaceHi,borderRadius:10,padding:'10px 12px',textAlign:'center'}}>
-                      <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:4}}>{item.label}</div>
-                      <div style={{fontSize:13,fontWeight:700,color:item.val==='user'?C.violetBr:item.val==='them'?C.gold:C.green,fontFamily:"'DM Sans',sans-serif",textTransform:'capitalize'}}>{item.val||'—'}</div>
+            {result.layer4_powerDynamics?.analysis && (
+              <Section title="Power Dynamics" accent={C.amber} badge={<Pill label={`${result.layer4_powerDynamics.whoHoldsPower} holds power`} color={C.amber} bg={`${C.amber}15`} />}>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', paddingTop: 16 }}>
+                  {[{ label: 'Power', val: result.layer4_powerDynamics.whoHoldsPower }, { label: 'Chasing', val: result.layer4_powerDynamics.whoIsChasing }, { label: 'Leading', val: result.layer4_powerDynamics.whoIsLeading }].map(item => (
+                    <div key={item.label} style={{ flex: '1 1 80px', background: C.warm1, border: `1px solid ${C.warm2}`, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 10.5, color: C.mutedLt, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 7px', fontFamily: 'monospace' }}>{item.label}</p>
+                      <p style={{ fontSize: 15, fontWeight: 800, color: item.val === 'user' ? C.red : item.val === 'them' ? C.amber : C.green, fontFamily: "'Bricolage Grotesque', sans-serif", margin: 0, textTransform: 'capitalize' }}>{item.val || '—'}</p>
                     </div>
                   ))}
                 </div>
-                <p style={{fontSize:13,color:C.muted2,lineHeight:1.7,margin:'0 0 10px'}}>{result.layer4_powerDynamics.analysis}</p>
-                {result.layer4_powerDynamics.rebalanceTip&&(
-                  <div style={{background:C.violetLo,borderRadius:10,padding:'10px 12px',borderLeft:`2px solid ${C.violetBr}`}}>
-                    <span style={{fontSize:12,color:C.violetBr}}>{result.layer4_powerDynamics.rebalanceTip}</span>
+                <p style={{ fontSize: 14.5, color: C.muted, lineHeight: 1.8, margin: '0 0 16px', fontFamily: "'DM Sans', sans-serif" }}>{result.layer4_powerDynamics.analysis}</p>
+                {result.layer4_powerDynamics.rebalanceTip && (
+                  <div style={{ background: C.warm1, borderLeft: `3px solid ${C.amber}`, borderRadius: '0 12px 12px 0', padding: '14px 18px' }}>
+                    <p style={{ fontSize: 14, color: C.ink, lineHeight: 1.7, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{result.layer4_powerDynamics.rebalanceTip}</p>
                   </div>
                 )}
-              </div>
+              </Section>
             )}
 
-            {/* Layer 3 — Psych signals */}
-            {result.layer3_psychSignals?.length>0&&(
-              <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:14}}>Psychological Signals</div>
-                <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                  {result.layer3_psychSignals.filter(s=>s.detected).map((s,i)=>(
-                    <motion.div key={i} initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:0.05+i*0.06,...SP}}
-                      style={{borderLeft:`2px solid ${C.violetBr}`,paddingLeft:14}}>
-                      <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:3}}>{s.signal}</div>
-                      {s.evidence&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic',marginBottom:4}}>"{s.evidence}"</div>}
-                      <div style={{fontSize:12,color:C.muted2,lineHeight:1.6}}>{s.meaning}</div>
-                    </motion.div>
+            {result.layer3_psychSignals?.filter(s => s.detected).length > 0 && (
+              <Section title="Psychological Signals" accent={C.teal} badge={<Pill label={`${result.layer3_psychSignals.filter(s => s.detected).length} detected`} color={C.teal} bg="rgba(58,122,138,0.12)" />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 16 }}>
+                  {result.layer3_psychSignals.filter(s => s.detected).map((s, i) => (
+                    <div key={i} style={{ borderLeft: `2px solid ${C.warm2}`, paddingLeft: 16 }}>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: '0 0 5px', fontFamily: "'Bricolage Grotesque', sans-serif" }}>{s.signal}</p>
+                      {s.evidence && <p style={{ fontSize: 13, color: C.mutedLt, fontStyle: 'italic', margin: '0 0 8px', fontFamily: "'DM Sans', sans-serif" }}>"{s.evidence}"</p>}
+                      <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{s.meaning}</p>
+                    </div>
                   ))}
                 </div>
-              </div>
+              </Section>
             )}
 
-            {/* Layer 8 — Attraction signals */}
-            {result.layer8_attractionSignals?.length>0&&(
-              <div style={{background:C.pinkLo,border:`1px solid ${C.pink}25`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.pink,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:14}}>Attraction Signals</div>
-                <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                  {result.layer8_attractionSignals.map((sig,i)=>(
-                    <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-                      <div style={{width:7,height:7,borderRadius:'50%',background:SIG[sig.type]??C.muted2,marginTop:4,flexShrink:0}}/>
+            {result.layer8_attractionSignals?.length > 0 && (
+              <Section title="Attraction Signals" accent="#A0426E">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingTop: 16 }}>
+                  {result.layer8_attractionSignals.map((sig, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: SIG_C[sig.type] ?? C.muted, marginTop: 6, flexShrink: 0, display: 'block' }} />
                       <div>
-                        <div style={{fontSize:12,fontWeight:600,color:SIG[sig.type]??C.muted2,marginBottom:2}}>{sig.signal}</div>
-                        {sig.evidence&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic',marginBottom:3}}>"{sig.evidence}"</div>}
-                        <div style={{fontSize:12,color:C.muted2,lineHeight:1.6}}>{sig.interpretation}</div>
+                        <p style={{ fontSize: 15, fontWeight: 700, color: SIG_C[sig.type] ?? C.muted, margin: '0 0 4px', fontFamily: "'Bricolage Grotesque', sans-serif" }}>{sig.signal}</p>
+                        {sig.evidence && <p style={{ fontSize: 12.5, color: C.mutedLt, fontStyle: 'italic', margin: '0 0 6px', fontFamily: "'DM Sans', sans-serif" }}>"{sig.evidence}"</p>}
+                        <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{sig.interpretation}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </Section>
             )}
 
-            {/* Layer 5 — Mistakes */}
-            {result.layer5_mistakes?.length>0&&(
-              <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.red,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:14}}>Mistakes Made</div>
-                <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {result.layer5_mistakes.map((m,i)=>(
-                    <motion.div key={i} initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:0.05+i*0.06,...SP}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
-                        <span style={{fontSize:12,fontWeight:700,color:SEV[m.severity]??C.red}}>{m.mistake}</span>
-                        <Tag label={m.severity} color={SEV[m.severity]??C.red} bg={`${SEV[m.severity]??C.red}15`}/>
+            {result.layer5_mistakes?.length > 0 && (
+              <Section title="Mistakes Made" accent={C.red} badge={<Pill label={`${result.layer5_mistakes.length} found`} color={C.red} bg={`${C.red}12`} />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingTop: 16 }}>
+                  {result.layer5_mistakes.map((m, i) => (
+                    <div key={i}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: SEV_C[m.severity] ?? C.red, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{m.mistake}</span>
+                        <Pill label={m.severity} color={SEV_C[m.severity] ?? C.red} bg={`${SEV_C[m.severity] ?? C.red}12`} />
                       </div>
-                      {m.whatHappened&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic',marginBottom:5}}>What happened: "{m.whatHappened}"</div>}
-                      <div style={{fontSize:12,color:C.muted2,lineHeight:1.65}}>{m.whyItHurts}</div>
-                    </motion.div>
+                      {m.whatHappened && <p style={{ fontSize: 13.5, color: C.mutedLt, fontStyle: 'italic', margin: '0 0 7px', fontFamily: "'DM Sans', sans-serif" }}>What happened: "{m.whatHappened}"</p>}
+                      <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{m.whyItHurts}</p>
+                    </div>
                   ))}
                 </div>
-              </div>
+              </Section>
             )}
 
-            {/* Layer 6 — Missed opportunities */}
-            {result.layer6_missedOpportunities?.length>0&&(
-              <div style={{background:C.goldLo,border:`1px solid ${C.gold}25`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.gold,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:14}}>Missed Opportunities</div>
-                <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {result.layer6_missedOpportunities.map((mo,i)=>(
-                    <div key={i} style={{borderLeft:`2px solid ${C.gold}50`,paddingLeft:14}}>
-                      <div style={{fontSize:11,color:C.muted,fontStyle:'italic',marginBottom:4}}>You said: "{mo.moment}"</div>
-                      <div style={{fontSize:12,color:C.muted2,marginBottom:6,lineHeight:1.5}}>{mo.whatWasMissed}</div>
-                      <div style={{background:'rgba(252,211,77,0.08)',borderRadius:8,padding:'8px 12px'}}>
-                        <div style={{fontSize:9,color:C.gold,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700,marginBottom:3}}>Better response</div>
-                        <div style={{fontSize:13,color:C.text,fontFamily:"'Instrument Serif',serif",fontStyle:'italic'}}>"{mo.betterResponse}"</div>
+            {result.layer6_missedOpportunities?.length > 0 && (
+              <Section title="Missed Opportunities" accent={C.amber} badge={<Pill label={`${result.layer6_missedOpportunities.length}`} color={C.amber} bg={`${C.amber}15`} />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 16 }}>
+                  {result.layer6_missedOpportunities.map((mo, i) => (
+                    <div key={i} style={{ borderLeft: `2px solid ${C.amber}40`, paddingLeft: 18 }}>
+                      <p style={{ fontSize: 13, color: C.mutedLt, fontStyle: 'italic', margin: '0 0 7px', fontFamily: "'DM Sans', sans-serif" }}>You said: "{mo.moment}"</p>
+                      <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: '0 0 14px', fontFamily: "'DM Sans', sans-serif" }}>{mo.whatWasMissed}</p>
+                      <div style={{ background: C.warm1, border: `1px solid ${C.warm2}`, borderRadius: 12, padding: '14px 16px' }}>
+                        <p style={{ fontSize: 10.5, fontWeight: 800, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 8px', fontFamily: 'monospace' }}>Better response</p>
+                        <p style={{ fontSize: 16, color: C.ink, fontStyle: 'italic', lineHeight: 1.7, margin: 0, fontFamily: 'Georgia, serif' }}>"{mo.betterResponse}"</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </Section>
             )}
 
-            {/* Layer 10 — Strategy */}
-            {result.layer10_strategy?.primaryAdvice&&(
-              <div style={{background:C.violetLo,border:`1px solid ${C.violetHi}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.violetBr,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:12}}>Strategy</div>
-                <p style={{fontSize:14,color:C.text,lineHeight:1.75,margin:'0 0 14px'}}>{result.layer10_strategy.primaryAdvice}</p>
-                <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {result.layer10_strategy.doThis&&(
-                    <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
-                      <Tag label="Do" color={C.green} bg={C.greenLo}/>
-                      <span style={{fontSize:13,color:C.muted2,lineHeight:1.6,paddingTop:2}}>{result.layer10_strategy.doThis}</span>
+            {result.layer10_strategy?.doThis && (
+              <Section title="Strategy & Next Steps" accent={C.green} defaultOpen>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 16 }}>
+                  {result.layer10_strategy.doThis && (
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                      <Pill label="Do this" color={C.green} bg="rgba(45,138,78,0.12)" />
+                      <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif", paddingTop: 2 }}>{result.layer10_strategy.doThis}</p>
                     </div>
                   )}
-                  {result.layer10_strategy.avoidThis&&(
-                    <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
-                      <Tag label="Avoid" color={C.red} bg={C.redLo}/>
-                      <span style={{fontSize:13,color:C.muted2,lineHeight:1.6,paddingTop:2}}>{result.layer10_strategy.avoidThis}</span>
+                  {result.layer10_strategy.avoidThis && (
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                      <Pill label="Avoid" color={C.red} bg={`${C.red}12`} />
+                      <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif", paddingTop: 2 }}>{result.layer10_strategy.avoidThis}</p>
                     </div>
                   )}
+                  {result.layer10_strategy.longTermRead && (
+                    <p style={{ fontSize: 13.5, color: C.mutedLt, lineHeight: 1.75, margin: '4px 0 0', fontStyle: 'italic', fontFamily: "'DM Sans', sans-serif" }}>
+                      {result.layer10_strategy.longTermRead}
+                    </p>
+                  )}
                 </div>
-                {result.layer10_strategy.longTermRead&&(
-                  <p style={{fontSize:12,color:C.muted,lineHeight:1.6,margin:'12px 0 0',fontStyle:'italic'}}>{result.layer10_strategy.longTermRead}</p>
-                )}
-              </div>
+              </Section>
             )}
           </motion.div>
         )}
 
-        {/* ── REWRITES TAB ── */}
-        {activeTab==='rewrites'&&(
-          <motion.div key="rewrites" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={EO}>
-            {/* Layer 7 — Rewrites */}
-            {result.layer7_rewrites?.originalMessage&&(
-              <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:10}}>Message Rewrites</div>
-                <div style={{background:'rgba(255,255,255,0.03)',borderRadius:10,padding:'10px 13px',marginBottom:14,borderLeft:`2px solid ${C.red}40`}}>
-                  <div style={{fontSize:9,color:C.red,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700,marginBottom:4}}>Original</div>
-                  <div style={{fontSize:13,color:C.muted2,fontStyle:'italic',fontFamily:"'Instrument Serif',serif"}}>"{result.layer7_rewrites.originalMessage}"</div>
-                </div>
-                {[
-                  {key:'playful',  label:'Playful',   color:C.pink,    bg:C.pinkLo},
-                  {key:'confident',label:'Confident', color:C.violetBr,bg:C.violetLo},
-                  {key:'curious',  label:'Curious',   color:C.cyan,    bg:C.cyanLo},
-                ].map(v=>{
-                  const ver=(result.layer7_rewrites as any)[v.key];
-                  if(!ver)return null;
-                  return(
-                    <motion.div key={v.key} initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} transition={{delay:0.1,...SP}}
-                      style={{background:v.bg,border:`1px solid ${v.color}25`,borderRadius:13,padding:'14px 16px',marginBottom:8}}>
-                      <Tag label={v.label} color={v.color} bg={`${v.color}20`}/>
-                      <p style={{fontSize:14,color:C.text,fontFamily:"'Instrument Serif',serif",fontStyle:'italic',lineHeight:1.65,margin:'10px 0 8px'}}>"{ver.message}"</p>
-                      <p style={{fontSize:12,color:C.muted,margin:0,lineHeight:1.5}}>{ver.why}</p>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
+        {tab === 'rewrites' && (
+          <motion.div key="r" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Layer 9 — Next moves */}
-            {result.layer9_nextMoves?.playful&&(
-              <div style={{background:C.violetLo,border:`1px solid ${C.violetHi}`,borderRadius:18,padding:'18px 20px',marginBottom:10}}>
-                <div style={{fontSize:9,color:C.violetBr,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:700,marginBottom:14}}>What to send next</div>
-                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {result.layer7_rewrites?.originalMessage && (
+              <Section title="Message Rewrites" accent="#A0426E" defaultOpen>
+                <div style={{ background: C.warm1, borderRadius: 12, padding: '14px 16px', marginBottom: 20, borderLeft: `2px solid ${C.red}40`, paddingTop: 16 }}>
+                  <p style={{ fontSize: 10.5, fontWeight: 800, color: C.red, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 9px', fontFamily: 'monospace' }}>Original</p>
+                  <p style={{ fontSize: 16, color: C.ink, fontStyle: 'italic', lineHeight: 1.7, margin: 0, fontFamily: 'Georgia, serif' }}>"{result.layer7_rewrites.originalMessage}"</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {[
-                    {key:'playful',  label:'Playful',   color:C.pink},
-                    {key:'curious',  label:'Curious',   color:C.cyan},
-                    {key:'confident',label:'Confident', color:C.violetBr},
-                  ].map(nm=>{
-                    const move=(result.layer9_nextMoves as any)[nm.key];
-                    if(!move)return null;
-                    return(
-                      <div key={nm.key} style={{background:'rgba(255,255,255,0.04)',borderRadius:12,padding:'13px 15px'}}>
-                        <Tag label={nm.label} color={nm.color} bg={`${nm.color}15`}/>
-                        <p style={{fontSize:14,color:C.text,fontFamily:"'Instrument Serif',serif",fontStyle:'italic',lineHeight:1.65,margin:'9px 0 6px'}}>"{move.message}"</p>
-                        <p style={{fontSize:11,color:C.muted,margin:0}}>{move.intent}</p>
+                    { key: 'playful',   label: 'Playful',    color: '#A0426E',    bg: 'rgba(160,66,110,0.08)'   },
+                    { key: 'confident', label: 'Confident',  color: C.red,        bg: `${C.red}08`              },
+                    { key: 'curious',   label: 'Curious',    color: C.teal,       bg: 'rgba(58,122,138,0.08)'   },
+                  ].map(v => {
+                    const ver = (result.layer7_rewrites as any)[v.key];
+                    if (!ver) return null;
+                    return (
+                      <div key={v.key} style={{ background: v.bg, border: `1.5px solid ${v.color}25`, borderRadius: 16, padding: '18px 20px' }}>
+                        <Pill label={v.label} color={v.color} bg={`${v.color}18`} />
+                        <p style={{ fontSize: 17, color: C.ink, fontStyle: 'italic', lineHeight: 1.7, margin: '14px 0 10px', fontFamily: 'Georgia, serif' }}>"{ver.message}"</p>
+                        <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.7, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{ver.why}</p>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              </Section>
+            )}
+
+            {result.layer9_nextMoves?.playful && (
+              <Section title="What to Send Next" accent={C.red} defaultOpen>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 14 }}>
+                  {[
+                    { key: 'playful',   label: 'Playful',    color: '#A0426E' },
+                    { key: 'curious',   label: 'Curious',    color: C.teal },
+                    { key: 'confident', label: 'Confident',  color: C.red },
+                  ].map(nm => {
+                    const move = (result.layer9_nextMoves as any)[nm.key];
+                    if (!move) return null;
+                    return (
+                      <div key={nm.key} style={{ background: C.warm1, border: `1.5px solid ${C.warm2}`, borderRadius: 16, padding: '18px 20px' }}>
+                        <Pill label={nm.label} color={nm.color} bg={`${nm.color}12`} />
+                        <p style={{ fontSize: 17, color: C.ink, fontStyle: 'italic', lineHeight: 1.7, margin: '12px 0 9px', fontFamily: 'Georgia, serif' }}>"{move.message}"</p>
+                        <p style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.65, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{move.intent}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
             )}
           </motion.div>
         )}
 
-        {/* ── COACH TAB ── */}
-        {activeTab==='coach'&&(
-          <motion.div key="coach" initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={EO}>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:13,color:C.muted2,lineHeight:1.7,marginBottom:4}}>
-                Type what you're about to send. The AI will give you an instant verdict and a better version.
-              </div>
-            </div>
-            <LiveCoach extractedText={result.extractedText} context={context}/>
+        {tab === 'coach' && (
+          <motion.div key="c" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease }}>
+            <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.8, margin: '0 0 16px', fontFamily: "'DM Sans', sans-serif" }}>
+              Draft your next message and get an instant verdict — send it, tweak it, or scrap it.
+            </p>
+            <LiveCoach extractedText={result.extractedText} context={context} />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Bottom CTA */}
-      <Reveal delay={0.3}>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',paddingTop:12}}>
-          <Link href="/practice" style={{flex:'1 1 130px',textDecoration:'none'}}>
-            <motion.button whileHover={{scale:1.02}} whileTap={{scale:0.98}}
-              style={{width:'100%',background:C.violetLo,border:`1px solid ${C.violetHi}`,borderRadius:12,padding:'12px 18px',color:C.violetBr,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
-              Practice this
+      <Fade delay={0.3}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 8 }}>
+          <Link href="/practice" style={{ flex: '1 1 140px', textDecoration: 'none' }}>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              style={{ width: '100%', background: C.warm1, border: `1.5px solid ${C.warm2}`, borderRadius: 14, padding: '16px 20px', color: C.ink, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif" }}>
+              Practice this →
             </motion.button>
           </Link>
-          <motion.button onClick={onReset} whileHover={{scale:1.02}} whileTap={{scale:0.98}}
-            style={{flex:'1 1 130px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'12px 18px',color:C.muted2,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
+          <motion.button onClick={onReset} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            style={{ flex: '1 1 140px', background: 'none', border: `1.5px solid ${C.warm2}`, borderRadius: 14, padding: '16px 20px', color: C.muted, fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
             Analyze another
           </motion.button>
         </div>
-      </Reveal>
+      </Fade>
     </div>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ──────────────────────────────────────────────────────────────────────────────
-type Step='context'|'upload'|'loading'|'result'|'error';
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+type Step = 'context' | 'upload' | 'loading' | 'result' | 'error';
 
-export default function UploadPage(){
-  const [step,setStep]=useState<Step>('context');
-  const [context,setContext]=useState('dating');
-  const [result,setResult]=useState<AnalysisResult|null>(null);
-  const [error,setError]=useState<string|null>(null);
+export default function UploadPage() {
+  const [step, setStep] = useState<Step>('context');
+  const [context, setContext] = useState('dating');
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAnalyze=async(file:File|null,text:string|null,language:string,roastMode:boolean)=>{
+  const runAnalysis = async (file: File | null, text: string | null, lang: string, roast: boolean, userSide = 'auto') => {
     setStep('loading'); setError(null);
-    try{
-      const fd=new FormData();
-      if(file)fd.append('image',file);
-      if(text)fd.append('text',text);
-      fd.append('context',context);
-      fd.append('language',language);
-      fd.append('roastMode',String(roastMode));
-
-      const res=await fetch('/api/analyze',{method:'POST',body:fd});
-      const data=await res.json();
-      if(!res.ok||!data.success){setError(data.error||'Analysis failed.');setStep('error');return;}
-      setResult(data);
-      setStep('result');
-    }catch(e:any){setError(e.message||'Something went wrong.');setStep('error');}
+    try {
+      const fd = new FormData();
+      if (file) fd.append('image', file);
+      if (text) fd.append('text', text);
+      fd.append('context', context); fd.append('language', lang);
+      fd.append('roastMode', String(roast)); fd.append('userSide', userSide);
+      const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setError(data.error || 'Analysis failed.'); setStep('error'); return; }
+      setResult(data); setStep('result');
+    } catch (e: any) { setError(e.message || 'Something went wrong.'); setStep('error'); }
   };
 
-  const reset=()=>{setStep('context');setResult(null);setError(null);};
+  const reset = () => { setStep('context'); setResult(null); setError(null); };
 
-  return(
+  return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        ::selection{background:rgba(91,79,233,0.3);}
-        ::-webkit-scrollbar{width:3px;}
-        ::-webkit-scrollbar-thumb{background:rgba(91,79,233,0.35);border-radius:2px;}
-        select option{background:#111;color:#F2F0EB;}
-        textarea{transition:border-color 0.2s;}
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,900&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+        body { background: ${C.cream}; }
+        ::selection { background: ${C.red}25; }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: ${C.red}40; border-radius: 2px; }
+        select option { background: ${C.warm1}; color: ${C.ink}; }
+        button { -webkit-tap-highlight-color: transparent; }
+        textarea::placeholder { color: ${C.mutedLt}; }
       `}</style>
 
-      <div style={{background:C.bg,color:C.text,fontFamily:"'DM Sans',sans-serif",minHeight:'100svh',overflowX:'hidden',paddingBottom:80}}>
-        <div style={{position:'fixed',top:0,left:'50%',transform:'translateX(-50%)',width:600,height:360,background:'radial-gradient(circle,rgba(91,79,233,0.06) 0%,transparent 70%)',pointerEvents:'none',zIndex:0}}/>
-        <div style={{position:'fixed',inset:0,zIndex:0,backgroundImage:'linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px)',backgroundSize:'48px 48px',pointerEvents:'none'}}/>
+      <div style={{ background: C.cream, color: C.ink, fontFamily: "'DM Sans', sans-serif", minHeight: '100svh', overflowX: 'hidden', paddingBottom: 100 }}>
+        <div style={{ maxWidth: 660, margin: '0 auto', padding: 'clamp(36px, 5vw, 60px) clamp(16px, 4vw, 28px) 60px' }}>
 
-        <div style={{maxWidth:600,margin:'0 auto',padding:'52px 18px 40px',position:'relative',zIndex:1}}>
-          {step==='context'&&(
-            <Reveal>
-              <Link href="/" style={{display:'inline-flex',alignItems:'center',gap:6,color:C.muted,fontSize:12,textDecoration:'none',fontFamily:"'DM Sans',sans-serif",marginBottom:28}}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 7H2M5.5 3L2 7l3.5 4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          {step === 'context' && (
+            <Fade>
+              <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: C.muted, fontSize: 13.5, textDecoration: 'none', fontFamily: "'DM Sans', sans-serif", marginBottom: 36, fontWeight: 600 }}>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 7.5H3M6 3.5L3 7.5l3 4" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Home
               </Link>
-            </Reveal>
+            </Fade>
           )}
 
           <AnimatePresence mode="wait">
-            <motion.div key={step} initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={EO}>
-              {step==='context'&&<StepContext onNext={ctx=>{setContext(ctx);setStep('upload');}}/>}
-              {step==='upload'&&<StepUpload context={context} onBack={()=>setStep('context')} onAnalyze={handleAnalyze}/>}
-              {step==='loading'&&<Loading/>}
-              {step==='result'&&result&&<StepResults result={result} context={context} onReset={reset}/>}
-              {step==='error'&&(
-                <div style={{textAlign:'center',padding:'60px 0'}}>
-                  <div style={{fontSize:13,color:C.red,marginBottom:8}}>Analysis failed</div>
-                  <div style={{fontSize:12,color:C.muted,marginBottom:24,maxWidth:320,margin:'0 auto 24px',lineHeight:1.6}}>{error}</div>
-                  <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
-                    <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={()=>setStep('upload')}
-                      style={{background:C.surface,border:`1px solid ${C.border}`,color:C.text,borderRadius:12,padding:'11px 20px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
+            <motion.div key={step} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4, ease }}>
+              {step === 'context' && <StepContext onNext={ctx => { setContext(ctx); setStep('upload'); }} />}
+              {step === 'upload' && <StepUpload context={context} onBack={() => setStep('context')} onAnalyze={runAnalysis} />}
+              {step === 'loading' && <LoadingView />}
+              {step === 'result' && result && <ResultsView result={result} context={context} onReset={reset} />}
+              {step === 'error' && (
+                <div style={{ textAlign: 'center', padding: '80px 0' }}>
+                  <div style={{ fontSize: 48, marginBottom: 20 }}>😬</div>
+                  <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 28, fontWeight: 900, color: C.red, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
+                    Analysis failed
+                  </h2>
+                  <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.8, maxWidth: 360, margin: '0 auto 32px', fontFamily: "'DM Sans', sans-serif" }}>{error}</p>
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                      onClick={() => setStep('upload')}
+                      style={{ background: C.ink, border: 'none', color: C.cream, borderRadius: 13, padding: '14px 28px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif" }}>
                       Try again
                     </motion.button>
-                    <motion.button whileHover={{scale:1.03}} whileTap={{scale:0.97}} onClick={reset}
-                      style={{background:'none',border:'none',color:C.muted,fontSize:13,cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                      onClick={reset}
+                      style={{ background: 'none', border: `1.5px solid ${C.warm2}`, color: C.muted, borderRadius: 13, padding: '14px 28px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                       Start over
                     </motion.button>
                   </div>

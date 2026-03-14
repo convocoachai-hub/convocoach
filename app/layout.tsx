@@ -1,5 +1,4 @@
-// app/layout.tsx — REPLACE your entire existing file
-
+// app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import Navbar from '@/components/Navbar';
@@ -27,7 +26,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-[var(--bg-void)] text-white">
         <Providers>
           <Navbar />
-          <main className="pb-20 md:pb-0">
+          {/* 🔥 FIXED: Removed the pb-20 class that was causing the weird gap */}
+          <main>
             {children}
           </main>
         </Providers>
@@ -36,7 +36,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
-
-// ─── ALSO CREATE: app/providers.tsx ──────────────────────────────────────────
-// Create this new file at app/providers.tsx
