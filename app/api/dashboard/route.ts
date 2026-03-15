@@ -142,6 +142,8 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({
       success: true,
       isPremium, // UI will still show upgrade prompts if false
+      username: dbUser.username || null,
+      usernameSetAt: dbUser.usernameSetAt || null,
       stats: {
         totalAnalyses: allAnalyses.length,
         practiceCount: allSessions.length, // Unlocked for data checking

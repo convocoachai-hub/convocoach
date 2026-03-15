@@ -6,423 +6,406 @@ import { usePathname } from 'next/navigation';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { Upload, Brain, MessageSquare, CreditCard, LayoutDashboard, User, LogOut, Menu, X, Home } from 'lucide-react';
-import logoImg from '@/app/logo.png'; // Matches your footer logo import
+import { Upload, Brain, LayoutDashboard, User, LogOut, Menu, X, ChevronDown } from 'lucide-react';
+import logoImg from '@/app/logo.png';
 
-// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
 const C = {
-  cream:   '#F3EDE2',
-  ink:     '#0F0C09',
-  red:     '#D13920',
-  warm1:   '#E8E0D2',
-  warm2:   '#D4CBBA',
-  muted:   '#8A8074',
-  mutedLt: '#BFB8AC',
+  cream: '#F3EDE2', ink: '#0F0C09', red: '#D13920',
+  warm1: '#E8E0D2', warm2: '#D4CBBA', muted: '#8A8074', mutedLt: '#BFB8AC',
 };
 
-const NAV_LINKS = [
-  { href: '/upload',   label: 'Analyze',  icon: Upload },
-  { href: '/practice', label: 'Practice', icon: Brain },
-  { href: '/examples', label: 'Examples', icon: MessageSquare },
-  { href: '/upgrade',  label: 'Pricing',  icon: CreditCard },
-];
+const MEGA_LINKS = {
+  Features: [
+    { label: 'Analyze Chat', href: '/upload' },
+    { label: 'Practice Mode', href: '/practice' },
+    { label: 'Examples', href: '/examples' },
+    { label: 'Pricing', href: '/upgrade' },
+    { label: 'Conversation Score', href: '/conversation-score' },
+    { label: 'Roast Mode', href: '/roast-mode' },
+  ],
+  Resources: [
+    { label: 'Dating Psychology', href: '/resources/dating-psychology' },
+    { label: 'Texting Guides', href: '/resources/texting-guides' },
+    { label: 'Attraction Signals', href: '/resources/attraction-signals' },
+    { label: 'Flirting Over Text', href: '/resources/flirting-over-text' },
+    { label: 'Stop Dry Texting', href: '/resources/stop-dry-texting' },
+    { label: 'Conversation Examples', href: '/resources/conversation-examples' },
+  ],
+  Support: [
+    { label: 'Help Center', href: '/help-center' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Report a Bug', href: '/report-bug' },
+    { label: 'Feature Requests', href: '/feature-requests' },
+    { label: 'System Status', href: '/status' },
+  ],
+  Company: [
+    { label: 'About Us', href: '/about' },
+    { label: 'Contact', href: '/contact' },
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms', href: '/terms' },
+    { label: 'Cookie Policy', href: '/cookie-policy' },
+  ],
+};
 
-const EO = { duration: 0.55, ease: [0.16, 1, 0.3, 1] } as const;
+type Cat = keyof typeof MEGA_LINKS;
+const CATS: Cat[] = ['Features', 'Resources', 'Support', 'Company'];
 
 export default function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Cat | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Scroll shadow
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsDropdownOpen(false);
-      }
+    const fn = () => {
+      setScrolled(prev => {
+        const isScrolled = window.scrollY > 12;
+        return prev !== isScrolled ? isScrolled : prev; // Only update if it actually changed
+      });
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  // Lock body scroll when mobile menu open
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'unset';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [isMobileMenuOpen]);
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [drawerOpen]);
 
-  // Is this a "light" page (cream bg) or dark page?
-  const isLightPage = pathname === '/' || pathname === '/upgrade';
+  // Close drawer on route change
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+
+  const lightPaths = ['/', '/upgrade', '/help-center', '/about', '/contact', '/privacy', '/terms', '/conversation-score', '/roast-mode', '/faq', '/report-bug', '/feature-requests', '/status', '/cookie-policy'];
+  const isLight = lightPaths.includes(pathname) || pathname.startsWith('/resources');
+  const txt = isLight ? C.ink : C.cream;
+  const dim = isLight ? C.muted : `${C.cream}55`;
+  const border = isLight ? C.warm2 : 'rgba(243,237,226,0.07)';
+
+  const catHasActive = (cat: Cat) => MEGA_LINKS[cat].some(l => pathname === l.href || pathname.startsWith(l.href + '/'));
 
   return (
     <>
-      <style>{`
-        .nav-link-dot {
-          width: 4px; height: 4px; border-radius: 50%;
-          background: ${C.red}; display: block;
-          margin: 0 auto; margin-top: 3px;
-          opacity: 0; transform: scale(0);
-          transition: all 0.2s ease;
-        }
-        .nav-link-active .nav-link-dot { opacity: 1; transform: scale(1); }
-      `}</style>
-
-      {/* ══════════════════════════════════════════════════════════════
-          DESKTOP NAVBAR
-      ══════════════════════════════════════════════════════════════ */}
-      <nav
-        className="hidden md:flex items-center justify-between px-9 sticky top-0 z-40 w-full transition-shadow duration-300"
-        style={{
-          height: 68,
-          background: isLightPage ? `${C.cream}E8` : `${C.ink}E8`,
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${isLightPage ? C.warm2 : 'rgba(243,237,226,0.07)'}`,
-          boxShadow: scrolled
-            ? isLightPage
-              ? '0 4px 24px rgba(15,12,9,0.08)'
-              : '0 4px 24px rgba(0,0,0,0.4)'
-            : 'none',
-        }}
-      >
-        {/* ── Logo ── */}
-        <Link href="/" className="z-10 block">
-          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }} className="flex items-center">
-            <Image 
-              src={logoImg} 
-              alt="ConvoCoach Logo" 
-              width={160} 
-              height={36} 
-              className="h-8 w-auto object-contain"
-              priority
-            />
-          </motion.div>
+      {/* ═══ TOP BAR (both desktop & mobile) ═══ */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 40, width: '100%',
+        height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 clamp(16px, 3vw, 36px)',
+        background: isLight ? `${C.cream}E8` : `${C.ink}E8`,
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: `1px solid ${border}`,
+        boxShadow: scrolled ? (isLight ? '0 4px 20px rgba(15,12,9,0.07)' : '0 4px 20px rgba(0,0,0,0.35)') : 'none',
+        transition: 'box-shadow 0.3s',
+      }}>
+        {/* Logo */}
+        <Link href="/" style={{ flexShrink: 0, display: 'block', lineHeight: 0 }}>
+          <Image src={logoImg} alt="ConvoCoach" width={130} height={28} style={{ height: 26, width: 'auto', objectFit: 'contain' }} priority />
         </Link>
 
-        {/* ── Center nav links (With Premium Hover Effects) ── */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-1">
-          {NAV_LINKS.map((link) => {
-            const isActive = pathname === link.href;
-            const Icon = link.icon;
+        {/* Center — quick links (desktop only) */}
+        <div className="hidden md:flex" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', alignItems: 'center', gap: 4 }}>
+          {[
+            { href: '/upload', label: 'Analyze', icon: Upload },
+            { href: '/practice', label: 'Practice', icon: Brain },
+          ].map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
             return (
-              <Link key={link.href} href={link.href} className={isActive ? 'nav-link-active' : ''} style={{ textDecoration: 'none' }}>
-                <motion.div 
-                  whileHover={{ 
-                    backgroundColor: isLightPage ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.08)',
-                    scale: 1.02
-                  }} 
-                  whileTap={{ scale: 0.97 }}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    padding: '8px 16px', borderRadius: 12, cursor: 'pointer',
-                    background: isActive ? (isLightPage ? C.warm1 : 'rgba(243,237,226,0.08)') : 'transparent',
-                    border: `1px solid ${isActive ? (isLightPage ? C.warm2 : 'rgba(243,237,226,0.1)') : 'transparent'}`,
-                    transition: 'all 0.2s ease',
-                  }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Icon style={{
-                      width: 15, height: 15,
-                      color: isActive ? (isLightPage ? C.ink : C.cream) : (isLightPage ? C.muted : `${C.cream}60`),
-                      transition: 'color 0.2s',
-                    }} />
-                    <span style={{
-                      fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: isActive ? 700 : 500,
-                      color: isActive ? (isLightPage ? C.ink : C.cream) : (isLightPage ? C.muted : `${C.cream}60`),
-                      transition: 'color 0.2s',
-                    }}>{link.label}</span>
-                  </div>
-                  <div className="nav-link-dot" />
-                </motion.div>
+              <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 10,
+                  background: active ? (isLight ? C.warm1 : 'rgba(243,237,226,0.08)') : 'transparent',
+                  border: `1px solid ${active ? border : 'transparent'}`,
+                  transition: 'all 0.15s', cursor: 'pointer',
+                }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <Icon style={{ width: 15, height: 15, color: active ? txt : dim, transition: 'color 0.15s' }} />
+                  <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? txt : dim, fontFamily: "'DM Sans', sans-serif", transition: 'color 0.15s' }}>{label}</span>
+                  {active && <span style={{ width: 4, height: 4, borderRadius: '50%', background: C.red, marginLeft: 2 }} />}
+                </div>
               </Link>
             );
           })}
         </div>
 
-        {/* ── Right: CTA + auth ── */}
-        <div className="flex items-center gap-4 z-10">
-          <Link href="/upgrade" style={{ textDecoration: 'none' }}>
-            <motion.button
-              whileHover={{ scale: 1.03, boxShadow: `0 6px 24px ${C.red}40` }}
+        {/* Right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Upgrade (desktop) */}
+         <Link href="/upgrade" className="hidden md:block" style={{ textDecoration: 'none' }}>
+            <motion.button 
+              whileHover={{ scale: 1.03, boxShadow: `0 6px 20px ${C.red}40` }}
               whileTap={{ scale: 0.97 }}
               style={{
-                background: C.red, color: '#fff', border: 'none', borderRadius: 12,
-                padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '0.02em',
-                boxShadow: `0 2px 12px ${C.red}25`, transition: 'box-shadow 0.2s'
-              }}>
-              Upgrade →
-            </motion.button>
+                background: C.red, color: '#fff', border: 'none', borderRadius: 10,
+                padding: '8px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                fontFamily: "'Bricolage Grotesque', sans-serif",
+                boxShadow: `0 2px 10px ${C.red}25`,
+              }}
+            >Upgrade →</motion.button>
           </Link>
 
-          {session ? (
-            <div style={{ position: 'relative' }} ref={dropdownRef}>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%', padding: 2, cursor: 'pointer',
-                  border: `2px solid ${isLightPage ? C.warm2 : 'rgba(243,237,226,0.12)'}`,
-                  background: 'none', transition: 'border-color 0.2s',
-                }}>
+          {/* PRO badge (mobile) */}
+          <Link href="/upgrade" className="md:hidden" style={{ textDecoration: 'none' }}>
+            <div style={{ background: C.red, color: '#fff', fontSize: 11, fontWeight: 800, padding: '5px 12px', borderRadius: 7, fontFamily: "'Bricolage Grotesque', sans-serif" }}>PRO</div>
+          </Link>
+
+          {/* Auth avatar (desktop) */}
+          {session && (
+            <Link href="/dashboard" className="hidden md:block" style={{ textDecoration: 'none', flexShrink: 0 }}>
+              <div style={{
+                borderRadius: '50%', padding: 2, border: `2px solid ${border}`,
+                transition: 'border-color 0.15s', cursor: 'pointer',
+              }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.red}
+                onMouseLeave={e => e.currentTarget.style.borderColor = border}
+              >
                 {session.user?.image ? (
-                  <Image src={session.user.image} alt={session.user.name || 'User'}
-                    width={36} height={36}
-                    style={{ borderRadius: '50%', display: 'block' }} />
+                  <Image src={session.user.image} alt="" width={32} height={32} style={{ borderRadius: '50%', display: 'block' }} />
                 ) : (
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: isLightPage ? C.warm1 : 'rgba(243,237,226,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <User style={{ width: 16, height: 16, color: isLightPage ? C.muted : `${C.cream}60` }} />
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: isLight ? C.warm1 : 'rgba(243,237,226,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User style={{ width: 14, height: 14, color: dim }} />
                   </div>
                 )}
-              </motion.button>
-
-              <AnimatePresence>
-                {isDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.96 }}
-                    transition={EO}
-                    style={{
-                      position: 'absolute', right: 0, marginTop: 12, width: 240,
-                      background: C.cream, border: `1.5px solid ${C.warm2}`,
-                      borderRadius: 18, overflow: 'hidden',
-                      boxShadow: '0 12px 48px rgba(15,12,9,0.15), 0 2px 8px rgba(15,12,9,0.08)',
-                      zIndex: 50,
-                    }}>
-                    <div style={{ padding: '16px 18px', borderBottom: `1px solid ${C.warm2}` }}>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, fontFamily: "'Bricolage Grotesque', sans-serif", margin: 0, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {session.user?.name}
-                      </p>
-                      <p style={{ fontSize: 12, color: C.muted, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'DM Sans', sans-serif" }}>
-                        {session.user?.email}
-                      </p>
-                    </div>
-
-                    <div style={{ padding: '8px' }}>
-                      <Link href="/dashboard" onClick={() => setIsDropdownOpen(false)} style={{ textDecoration: 'none' }}>
-                        <motion.div whileHover={{ background: C.warm1 }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', transition: 'background 0.15s' }}>
-                          <LayoutDashboard style={{ width: 16, height: 16, color: C.muted, flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 600, color: C.ink, fontFamily: "'DM Sans', sans-serif" }}>Dashboard</span>
-                        </motion.div>
-                      </Link>
-
-                      <div style={{ height: 1, background: C.warm2, margin: '6px 0' }} />
-
-                      <motion.button whileHover={{ background: `${C.red}15` }}
-                        onClick={() => { setIsDropdownOpen(false); signOut(); }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                          borderRadius: 12, cursor: 'pointer', width: '100%', textAlign: 'left',
-                          background: 'none', border: 'none', transition: 'background 0.15s',
-                        }}>
-                        <LogOut style={{ width: 16, height: 16, color: C.red, flexShrink: 0 }} />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: C.red, fontFamily: "'DM Sans', sans-serif" }}>Sign out</span>
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <motion.button whileHover={{ scale: 1.03, backgroundColor: isLightPage ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.1)' }} whileTap={{ scale: 0.97 }}
-              onClick={() => signIn('google')}
-              style={{
-                background: 'transparent', border: `1.5px solid ${isLightPage ? C.warm2 : 'rgba(243,237,226,0.15)'}`,
-                borderRadius: 12, padding: '9px 20px', fontSize: 14, fontWeight: 600,
-                color: isLightPage ? C.ink : C.cream, cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s',
-              }}>
-              Sign in
-            </motion.button>
+              </div>
+            </Link>
           )}
-        </div>
-      </nav>
 
-      {/* ══════════════════════════════════════════════════════════════
-          MOBILE TOP BAR (Fixed Stacking Bug)
-      ══════════════════════════════════════════════════════════════ */}
-      <nav
-        className="flex md:hidden items-center justify-between px-5 sticky top-0 z-40 w-full transition-shadow duration-300"
-        style={{
-          height: 64,
-          background: isLightPage ? `${C.cream}F0` : `${C.ink}F0`,
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${isLightPage ? C.warm2 : 'rgba(243,237,226,0.07)'}`,
-          boxShadow: scrolled ? '0 2px 16px rgba(15,12,9,0.08)' : 'none',
-        }}>
-        
-        {/* Mobile Logo */}
-        <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="block">
-          <Image 
-            src={logoImg} 
-            alt="ConvoCoach Logo" 
-            width={130} 
-            height={28} 
-            className="h-7 w-auto object-contain"
-            priority
-          />
-        </Link>
+          {/* Sign in (desktop, not logged in) */}
+          {!session && (
+            <button className="hidden md:block" onClick={() => signIn('google')}
+              style={{
+                background: 'transparent', border: `1.5px solid ${border}`,
+                borderRadius: 10, padding: '7px 16px', fontSize: 13, fontWeight: 600,
+                color: txt, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >Sign in</button>
+          )}
 
-        <div className="flex items-center gap-3">
-          <Link href="/upgrade" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-            <div style={{ background: C.red, color: '#fff', fontSize: 12, fontWeight: 800, padding: '6px 14px', borderRadius: 8, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '0.04em' }}>
-              PRO
-            </div>
-          </Link>
-          <motion.button whileTap={{ scale: 0.93 }}
-            onClick={() => setIsMobileMenuOpen(true)}
+          {/* Hamburger — always visible */}
+          <button
+            onClick={() => setDrawerOpen(true)}
             style={{
-              width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: 10, background: isLightPage ? C.warm1 : 'rgba(243,237,226,0.07)',
-              border: `1px solid ${isLightPage ? C.warm2 : 'rgba(243,237,226,0.1)'}`,
-              cursor: 'pointer',
-            }}>
-            <Menu style={{ width: 20, height: 20, color: isLightPage ? C.ink : C.cream }} />
-          </motion.button>
+              width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 10, background: isLight ? C.warm1 : 'rgba(243,237,226,0.07)',
+              border: `1px solid ${border}`, cursor: 'pointer', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = isLight ? C.warm2 : 'rgba(243,237,226,0.12)'}
+            onMouseLeave={e => e.currentTarget.style.background = isLight ? C.warm1 : 'rgba(243,237,226,0.07)'}
+          >
+            <Menu style={{ width: 18, height: 18, color: txt }} />
+          </button>
         </div>
       </nav>
 
-      {/* ══════════════════════════════════════════════════════════════
-          MOBILE DRAWER
-      ══════════════════════════════════════════════════════════════ */}
+      {/* ═══ SIDE DRAWER (unified for desktop + mobile) ═══ */}
       <AnimatePresence>
-        {isMobileMenuOpen && (
+        {drawerOpen && (
           <>
+            {/* Overlay */}
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,9,0.55)', backdropFilter: 'blur(4px)', zIndex: 50 }}
-              className="md:hidden" />
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              onClick={() => setDrawerOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(15,12,9,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 50, cursor: 'pointer', willChange: 'opacity' }}
+            />
 
+            {/* Panel */}
             <motion.div
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }} // Snappy, premium slide-in
               style={{
                 position: 'fixed', top: 0, right: 0, height: '100dvh',
-                width: '85vw', maxWidth: 320,
-                background: C.cream, borderLeft: `1.5px solid ${C.warm2}`,
+                width: 'clamp(280px, 85vw, 360px)',
+                background: C.cream, borderLeft: `1px solid ${C.warm2}`,
                 zIndex: 51, display: 'flex', flexDirection: 'column',
-                boxShadow: '-8px 0 48px rgba(15,12,9,0.18)',
+                boxShadow: '-4px 0 30px rgba(15,12,9,0.12)',
               }}
-              className="md:hidden">
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: `1px solid ${C.warm2}` }}>
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: C.red }}>
-                  Menu
-                </span>
-                <motion.button whileTap={{ scale: 0.92 }}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: C.warm1, border: `1px solid ${C.warm2}`, cursor: 'pointer' }}>
-                  <X style={{ width: 18, height: 18, color: C.ink }} />
-                </motion.button>
+            >
+              {/* ── Header ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${C.warm2}`, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: C.red }}>Menu</span>
+                <button onClick={() => setDrawerOpen(false)}
+                  style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, background: C.warm1, border: `1px solid ${C.warm2}`, cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.warm2}
+                  onMouseLeave={e => e.currentTarget.style.background = C.warm1}
+                >
+                  <X style={{ width: 16, height: 16, color: C.ink }} />
+                </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <Link href="/" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-                  <motion.div whileHover={{ x: 4 }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
-                      borderRadius: 14, background: pathname === '/' ? C.warm1 : 'transparent',
-                      border: `1px solid ${pathname === '/' ? C.warm2 : 'transparent'}`,
-                      transition: 'all 0.15s',
-                    }}>
-                    <Home style={{ width: 20, height: 20, color: pathname === '/' ? C.ink : C.muted, flexShrink: 0 }} />
-                    <span style={{ fontSize: 16, fontWeight: pathname === '/' ? 700 : 500, color: pathname === '/' ? C.ink : C.muted, fontFamily: "'DM Sans', sans-serif" }}>Home</span>
-                    {pathname === '/' && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: C.red, display: 'block' }} />}
-                  </motion.div>
-                </Link>
+              {/* ── Scrollable body ── */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
 
-                {NAV_LINKS.map((link) => {
-                  const isActive = pathname === link.href;
+                {/* Primary CTAs */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { href: '/upload', label: 'Analyze', sub: 'Upload chat', icon: Upload },
+                    { href: '/practice', label: 'Practice', sub: 'Train with AI', icon: Brain },
+                  ].map(({ href, label, sub, icon: Icon }) => {
+                    const active = pathname === href;
+                    return (
+                      <Link key={href} href={href} onClick={() => setDrawerOpen(false)} style={{ textDecoration: 'none', flex: 1 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '13px 14px', borderRadius: 14,
+                          background: active ? C.ink : C.warm1, border: `1px solid ${active ? C.ink : C.warm2}`,
+                          transition: 'all 0.15s', cursor: 'pointer',
+                        }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.warm2; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = C.warm1; }}
+                        >
+                          <Icon style={{ width: 17, height: 17, color: active ? C.cream : C.red, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: active ? C.cream : C.ink, fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+                            <div style={{ fontSize: 10, color: active ? `${C.cream}60` : C.muted }}>{sub}</div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                <div style={{ height: 1, background: C.warm2, margin: '0 4px 6px' }} />
+
+                {/* Category sections — collapsible */}
+                {CATS.map(cat => {
+                  const isExp = expanded === cat;
+                  const hasActive = catHasActive(cat);
                   return (
-                    <Link key={link.href} href={link.href} onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-                      <motion.div whileHover={{ x: 4 }}
+                    <div key={cat} style={{ marginBottom: 1 }}>
+                      <button
+                        onClick={() => setExpanded(isExp ? null : cat)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
-                          borderRadius: 14, background: isActive ? C.warm1 : 'transparent',
-                          border: `1px solid ${isActive ? C.warm2 : 'transparent'}`,
-                          transition: 'all 0.15s',
-                        }}>
-                        <link.icon style={{ width: 20, height: 20, color: isActive ? C.ink : C.muted, flexShrink: 0 }} />
-                        <span style={{ fontSize: 16, fontWeight: isActive ? 700 : 500, color: isActive ? C.ink : C.muted, fontFamily: "'DM Sans', sans-serif" }}>{link.label}</span>
-                        {isActive && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: C.red, display: 'block' }} />}
-                      </motion.div>
-                    </Link>
+                          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
+                          background: isExp ? C.warm1 : 'transparent',
+                          border: 'none', transition: 'background 0.12s',
+                        }}
+                        onMouseEnter={e => { if (!isExp) e.currentTarget.style.background = `${C.warm1}80`; }}
+                        onMouseLeave={e => { if (!isExp) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: hasActive ? 700 : 600, color: hasActive ? C.ink : C.muted, fontFamily: "'DM Sans', sans-serif" }}>{cat}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {hasActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.red }} />}
+                          <ChevronDown style={{
+                            width: 14, height: 14, color: C.muted,
+                            transition: 'transform 0.2s', transform: isExp ? 'rotate(180deg)' : 'rotate(0)',
+                          }} />
+                        </div>
+                      </button>
+
+                      <AnimatePresence>
+                        {isExp && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                            style={{ overflow: 'hidden', paddingLeft: 8 }}
+                          >
+                            {MEGA_LINKS[cat].map(link => {
+                              const active = pathname === link.href;
+                              return (
+                                <Link key={link.href} href={link.href} onClick={() => setDrawerOpen(false)} style={{ textDecoration: 'none' }}>
+                                  <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '9px 14px', borderRadius: 9,
+                                    background: active ? `${C.red}08` : 'transparent',
+                                    transition: 'background 0.12s', cursor: 'pointer',
+                                  }}
+                                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = `${C.warm1}80`; }}
+                                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? `${C.red}08` : 'transparent'; }}
+                                  >
+                                    <span style={{ fontSize: 13, fontWeight: active ? 650 : 450, color: active ? C.ink : C.muted, fontFamily: "'DM Sans', sans-serif" }}>{link.label}</span>
+                                    {active && <span style={{ width: 4, height: 4, borderRadius: '50%', background: C.red }} />}
+                                  </div>
+                                </Link>
+                              );
+                            })}
+                            <div style={{ height: 4 }} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   );
                 })}
 
-                <div style={{ height: 1, background: C.warm2, margin: '12px 4px' }} />
+                <div style={{ height: 1, background: C.warm2, margin: '8px 4px 10px' }} />
 
-                <Link href="/upgrade" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                      padding: '16px', borderRadius: 14, background: C.ink, cursor: 'pointer',
-                    }}>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: C.cream, fontFamily: "'Bricolage Grotesque', sans-serif" }}>Upgrade to Premium</span>
-                    <span style={{ fontSize: 14, color: C.red, fontWeight: 900 }}>→</span>
-                  </motion.div>
+                {/* Upgrade CTA */}
+                <Link href="/upgrade" onClick={() => setDrawerOpen(false)} style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '14px', borderRadius: 12, background: C.ink, cursor: 'pointer',
+                    transition: 'opacity 0.15s',
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 800, color: C.cream, fontFamily: "'Bricolage Grotesque', sans-serif" }}>Upgrade to Premium</span>
+                    <span style={{ fontSize: 13, color: C.red, fontWeight: 900 }}>→</span>
+                  </div>
                 </Link>
               </div>
 
-              <div style={{ padding: '20px 16px', borderTop: `1px solid ${C.warm2}`, background: C.warm1 }}>
+              {/* ── Auth footer ── */}
+              <div style={{ padding: '16px 14px', borderTop: `1px solid ${C.warm2}`, background: C.warm1, flexShrink: 0 }}>
                 {session ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       {session.user?.image ? (
-                        <Image src={session.user.image} alt="" width={44} height={44}
-                          style={{ borderRadius: '50%', border: `1.5px solid ${C.warm2}`, display: 'block' }} />
+                        <Image src={session.user.image} alt="" width={40} height={40} style={{ borderRadius: '50%', border: `1.5px solid ${C.warm2}`, display: 'block' }} />
                       ) : (
-                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: C.warm2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <User style={{ width: 20, height: 20, color: C.muted }} />
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: C.warm2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <User style={{ width: 18, height: 18, color: C.muted }} />
                         </div>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, fontFamily: "'Bricolage Grotesque', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.user?.name}</div>
-                        <div style={{ fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.user?.email}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink, fontFamily: "'Bricolage Grotesque', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.user?.name}</div>
+                        <div style={{ fontSize: 11, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.user?.email}</div>
                       </div>
                     </div>
-
-                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none' }}>
-                      <motion.div whileTap={{ scale: 0.97 }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.cream, border: `1px solid ${C.warm2}`, borderRadius: 12, cursor: 'pointer' }}>
-                        <LayoutDashboard style={{ width: 18, height: 18, color: C.muted }} />
-                        <span style={{ fontSize: 15, fontWeight: 600, color: C.ink, fontFamily: "'DM Sans', sans-serif" }}>My Dashboard</span>
-                      </motion.div>
-                    </Link>
-
-                    <motion.button whileTap={{ scale: 0.97 }}
-                      onClick={() => { setIsMobileMenuOpen(false); signOut(); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                        padding: '14px 16px', background: `${C.red}10`, border: `1px solid ${C.red}25`,
-                        borderRadius: 12, cursor: 'pointer', width: '100%',
-                      }}>
-                      <LogOut style={{ width: 16, height: 16, color: C.red }} />
-                      <span style={{ fontSize: 15, fontWeight: 700, color: C.red, fontFamily: "'DM Sans', sans-serif" }}>Sign out</span>
-                    </motion.button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Link href="/dashboard" onClick={() => setDrawerOpen(false)} style={{ textDecoration: 'none', flex: 1 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px',
+                          background: C.cream, border: `1px solid ${C.warm2}`, borderRadius: 10, cursor: 'pointer',
+                          transition: 'background 0.12s',
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.background = C.warm2}
+                          onMouseLeave={e => e.currentTarget.style.background = C.cream}
+                        >
+                          <LayoutDashboard style={{ width: 14, height: 14, color: C.muted }} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>Dashboard</span>
+                        </div>
+                      </Link>
+                      <button onClick={() => { setDrawerOpen(false); signOut(); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          padding: '11px 16px', background: `${C.red}08`, border: `1px solid ${C.red}20`,
+                          borderRadius: 10, cursor: 'pointer', transition: 'background 0.12s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = `${C.red}15`}
+                        onMouseLeave={e => e.currentTarget.style.background = `${C.red}08`}
+                      >
+                        <LogOut style={{ width: 14, height: 14, color: C.red }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.red }}>Out</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => { setIsMobileMenuOpen(false); signIn('google'); }}
+                  <button onClick={() => { setDrawerOpen(false); signIn('google'); }}
                     style={{
                       width: '100%', background: C.ink, color: C.cream, border: 'none',
-                      borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 800, cursor: 'pointer',
-                      fontFamily: "'Bricolage Grotesque', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                    }}>
-                    Sign in to your account
-                  </motion.button>
+                      borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                      fontFamily: "'Bricolage Grotesque', sans-serif", transition: 'opacity 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  >Sign in</button>
                 )}
               </div>
             </motion.div>

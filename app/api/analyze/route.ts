@@ -11,7 +11,7 @@ import { cookies } from 'next/headers';
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const ANON_COOKIE = 'cc_a1';
-const FREE_MAX    = 3;
+const FREE_MAX    = 5;  // signed-in free users get 5 analyses
 
 // ─── CRITICAL: Sanitize control characters inside JSON strings ────────────────
 // The AI sometimes returns JSON with literal newlines/tabs inside string values
@@ -155,11 +155,19 @@ function buildPrompt(context: string, language: string, roastMode: boolean, user
   const langNote = LANGUAGE_HINTS[language]  ?? LANGUAGE_HINTS.auto;
   const sideNote = speakerHint(userSide);
 
-  return `You are an expert conversation analyst, dating psychologist, and behavioral communication coach. Produce a deep, premium-quality 10-layer analysis with genuine psychological insight.
+  return `You are an elite conversation analyst combining expertise in behavioral psychology, attachment theory, and communication dynamics. Produce a premium-quality 10-layer deep analysis that would genuinely change how someone understands their conversations.
+
+CRITICAL QUALITY STANDARDS:
+- ALWAYS cite specific messages from the conversation as evidence. Never make claims without pointing to what was actually said.
+- Be brutally specific. Instead of "they seem interested", say exactly WHICH messages show interest and WHY those specific words/patterns indicate it.
+- Detect subtle signals most people miss: response timing patterns, question types (open vs closed), emotional investment asymmetry, mirroring language, topic escalation/de-escalation.
+- For mistakes and missed opportunities, explain the PSYCHOLOGICAL mechanism — WHY does double-texting reduce perceived value? WHY does matching their energy level matter?
+- Write rewrites that are genuinely better — not just different. Each rewrite should demonstrate a specific communication principle.
+- Strategy advice must be immediately actionable and specific to THIS conversation, not generic dating tips.
 
 LANGUAGE: ${langNote}
 CONTEXT: ${ctxNote}
-${roastMode ? 'ROAST MODE ENABLED: Be brutally honest and darkly funny. Reference specific real messages. End with one real actionable tip despite the roast.' : ''}
+${roastMode ? 'ROAST MODE ENABLED: Be brutally honest and darkly funny. Reference specific real messages by quoting them. Your roast must be so specific that it could only apply to THIS conversation. End with one genuinely actionable tip despite the roast.' : ''}
 
 ${sideNote}
 
@@ -270,6 +278,21 @@ Never analyze or quote any of these UI elements — they are noise:
     "longTermRead":  "<honest assessment of whether this connection has real potential>"
   },
 
+  "conversationPersonalityType": {
+    "type": "<one of: 'Playful' | 'Logical' | 'Flirty' | 'Awkward' | 'Dry' | 'Interview-style'>",
+    "description": "<1-2 sentences explaining WHY the user's texting style falls into this category, citing specific examples>",
+    "emoji": "<single emoji that represents this style>"
+  },
+
+  "redFlags": [
+    {
+      "pattern": "<name of the red flag pattern, e.g. 'Breadcrumbing', 'Ghosting Signals', 'Love Bombing', 'Mixed Signals', 'Low Investment'>",
+      "evidence": "<exact quote or specific behavior from the conversation that shows this pattern>",
+      "severity": "<'low' | 'medium' | 'high'>",
+      "advice": "<1-2 sentences of actionable advice on how to respond to this red flag>"
+    }
+  ],
+
   "overallScore":          <float 0.0–10.0, weighted average of layer2 scores>,
   "interestLevel":         <integer 0–100, how interested THE OTHER PERSON seems>,
   "attractionProbability": <integer 0–100>,
@@ -300,6 +323,17 @@ function scoreToPoints(score: number): number {
 // ─── POST ─────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // ── Rate limiting ────────────────────────────────────────────────────────
+    const { rateLimit, getClientIP } = await import('@/lib/rateLimit');
+    const ip = getClientIP(request.headers);
+    const rl = rateLimit(ip, { max: 10, windowSec: 60 });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait before trying again.', retryAfter: rl.retryAfterSec },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+      );
+    }
+
     // ── Auth & paywall ──────────────────────────────────────────────────────
     const session = await getServerSession(authOptions);
     const userId  = (session?.user as any)?.id ?? null;
@@ -309,7 +343,7 @@ export async function POST(request: NextRequest) {
       const used = cookieStore.get(ANON_COOKIE)?.value === '1';
       if (used) {
         return NextResponse.json(
-          { error: 'paywall', message: 'Sign in to get 3 more free analyses.', requiresAuth: true },
+          { error: 'paywall', premiumRequired: true, requiresAuth: true, message: 'Create a free account to unlock 5 more analyses and deeper insights.' },
           { status: 402 }
         );
       }
@@ -320,7 +354,7 @@ export async function POST(request: NextRequest) {
         const isPaid = dbUser.subscriptionStatus === 'paid' || dbUser.subscriptionStatus === 'lifetime';
         if (!isPaid && (dbUser.freeTriesUsed ?? 0) >= FREE_MAX) {
           return NextResponse.json(
-            { error: 'paywall', message: `You've used all ${FREE_MAX} free analyses. Upgrade for unlimited.`, requiresUpgrade: true },
+            { error: 'paywall', premiumRequired: true, requiresUpgrade: true, message: `You've used all ${FREE_MAX} free analyses. Upgrade to Premium for unlimited analysis and full conversation intelligence.` },
             { status: 402 }
           );
         }

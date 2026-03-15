@@ -1,8 +1,14 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { isPremium as checkPremium, LIMITS } from '@/lib/premiumUtils';
+import PremiumGate from '@/components/PremiumGate';
+import PremiumModal from '@/components/PremiumModal';
+import ShareScoreCard from '@/components/ShareCard';
+import RewardAdModal from '@/components/RewardAdModal';
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 const C = {
@@ -63,6 +69,8 @@ interface AnalysisResult {
   layer8_attractionSignals: Array<{ signal: string; type: string; evidence: string; interpretation: string }>;
   layer9_nextMoves: { playful: { message: string; intent: string }; curious: { message: string; intent: string }; confident: { message: string; intent: string } };
   layer10_strategy: { primaryAdvice: string; doThis: string; avoidThis: string; urgency: string; longTermRead: string };
+  conversationPersonalityType?: { type: string; description: string; emoji: string };
+  redFlags?: Array<{ pattern: string; evidence: string; severity: string; advice: string }>;
   extractedText: string;
 }
 interface CoachResult {
@@ -480,20 +488,25 @@ function LoadingView() {
 }
 
 // ─── LIVE COACH ───────────────────────────────────────────────────────────────
-function LiveCoach({ extractedText, context }: { extractedText: string; context: string }) {
+function LiveCoach({ extractedText, context, isPaid }: { extractedText: string; context: string; isPaid: boolean }) {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<CoachResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [checksUsed, setChecksUsed] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const coachLimit = isPaid ? Infinity : LIMITS.FREE_COACH_CHECKS;
 
   const run = async () => {
     if (!draft.trim() || loading) return;
+    if (checksUsed >= coachLimit) { setShowModal(true); return; }
     setLoading(true); setRes(null); setErr(null);
     try {
       const r = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftMessage: draft, conversationHistory: extractedText, context }) });
       const d = await r.json();
       if (!d.success) throw new Error(d.error || 'Failed');
       setRes(d);
+      setChecksUsed(prev => prev + 1);
     } catch (e: any) { setErr(e.message); }
     finally { setLoading(false); }
   };
@@ -596,50 +609,7 @@ function ChatReplay({ extractedText }: { extractedText: string }) {
   );
 }
 
-// ─── SHARE CARD ───────────────────────────────────────────────────────────────
-function ShareCard({ result }: { result: AnalysisResult }) {
-  const [copied, setCopied] = useState(false);
-  const sc = result.overallScore;
-  const scColor = sc >= 7 ? C.green : sc >= 5 ? C.amber : C.red;
 
-  const copy = async () => {
-    const t = `ConvoCoach Analysis\nScore: ${sc.toFixed(1)}/10\nInterest: ${result.interestLevel}% | Attraction: ${result.attractionProbability}%\nMomentum: ${result.conversationMomentum}\n"${result.layer1_diagnosis?.verdict || ''}"`;
-    await navigator.clipboard.writeText(t).catch(() => {});
-    setCopied(true); setTimeout(() => setCopied(false), 2500);
-  };
-
-  return (
-    <div style={{ background: C.ink, borderRadius: 20, padding: '28px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${scColor}20, transparent 70%)`, pointerEvents: 'none' }} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-        <p style={{ fontSize: 10.5, fontWeight: 800, color: `${C.cream}35`, textTransform: 'uppercase', letterSpacing: '0.14em', margin: 0, fontFamily: 'monospace' }}>Your Score Card</p>
-        <motion.button onClick={copy} whileTap={{ scale: 0.97 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 7, background: copied ? 'rgba(45,138,78,0.15)' : 'rgba(243,237,226,0.07)', border: `1px solid ${copied ? 'rgba(45,138,78,0.3)' : 'rgba(243,237,226,0.12)'}`, borderRadius: 9, padding: '8px 16px', color: copied ? C.green : `${C.cream}60`, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.25s' }}>
-          {copied ? '✓ Copied!' : '⎘ Share'}
-        </motion.button>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(72px, 15vw, 100px)', fontWeight: 900, color: scColor, lineHeight: 1, letterSpacing: '-0.05em' }}>{sc.toFixed(1)}</span>
-        <span style={{ fontSize: 26, color: `${C.cream}30`, marginBottom: 8, fontFamily: "'Bricolage Grotesque', sans-serif" }}>/10</span>
-      </div>
-      {result.layer1_diagnosis?.verdict && (
-        <p style={{ fontSize: 15.5, color: `${C.cream}60`, fontStyle: 'italic', lineHeight: 1.7, margin: '0 0 22px', fontFamily: 'Georgia, serif' }}>"{result.layer1_diagnosis.verdict}"</p>
-      )}
-      <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Their Interest',   val: `${result.interestLevel}%`,           color: '#A0426E' },
-          { label: 'Attraction',       val: `${result.attractionProbability}%`,   color: C.amber },
-          { label: 'Momentum',         val: result.conversationMomentum,          color: result.conversationMomentum === 'escalating' ? C.green : result.conversationMomentum === 'dying' ? C.red : C.amber },
-        ].map(m => (
-          <div key={m.label}>
-            <p style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 22, fontWeight: 900, color: m.color, margin: '0 0 4px', textTransform: 'capitalize', letterSpacing: '-0.02em' }}>{m.val}</p>
-            <p style={{ fontSize: 10.5, color: `${C.cream}35`, textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, fontFamily: 'monospace' }}>{m.label}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─── FLAG GRID ────────────────────────────────────────────────────────────────
 function FlagGrid({ result }: { result: AnalysisResult }) {
@@ -705,7 +675,92 @@ const SCORES = [
   { key: 'conversationalMomentum', label: 'Momentum',      color: C.green },
 ];
 
-function ResultsView({ result, context, onReset }: { result: AnalysisResult; context: string; onReset: () => void }) {
+// ─── SMART REPLY GENERATOR ───────────────────────────────────────────────────
+const TONE_STYLES: Record<string, { color: string; bg: string; emoji: string }> = {
+  playful:   { color: '#A0426E', bg: 'rgba(160,66,110,0.08)', emoji: '😏' },
+  confident: { color: C.red,    bg: `${C.red}08`,             emoji: '💪' },
+  curious:   { color: C.teal,   bg: 'rgba(58,122,138,0.08)',  emoji: '🤔' },
+};
+
+function SmartReplySection({ extractedText, context, score, isPaid }: { extractedText: string; context: string; score: number; isPaid: boolean }) {
+  const [replies, setReplies] = useState<Array<{ tone: string; message: string; why: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const generate = async () => {
+    setLoading(true); setErr(null);
+    try {
+      const r = await fetch('/api/generate-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationText: extractedText, context, analysisScore: score }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.success) throw new Error(d.message || 'Failed');
+      setReplies(d.replies || []);
+    } catch (e: any) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const copy = (msg: string, tone: string) => {
+    navigator.clipboard.writeText(msg);
+    setCopied(tone);
+    setTimeout(() => setCopied(null), 1800);
+  };
+
+  if (!isPaid) {
+    return <PremiumGate title="Smart Next Message" description="Generate 3 AI-crafted replies tailored to this conversation — playful, confident, and curious." compact />;
+  }
+
+  return (
+    <Section title="Generate Smart Reply" accent={C.teal}>
+      <div style={{ paddingTop: 14 }}>
+        {replies.length === 0 && !loading && (
+          <motion.button onClick={generate} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            style={{ width: '100%', padding: '16px 20px', borderRadius: 14, border: `1.5px solid ${C.teal}40`, background: `${C.teal}08`, color: C.teal, fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            ✨ Generate 3 Smart Replies
+          </motion.button>
+        )}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+              style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${C.teal}40`, borderTopColor: C.teal, margin: '0 auto 10px' }} />
+            <p style={{ fontSize: 13, color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>Generating replies…</p>
+          </div>
+        )}
+        {err && <p style={{ fontSize: 13.5, color: C.red, padding: '11px 14px', background: `${C.red}10`, borderRadius: 10, fontFamily: "'DM Sans', sans-serif", border: `1px solid ${C.red}25` }}>{err}</p>}
+        {replies.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {replies.map(r => {
+              const s = TONE_STYLES[r.tone] ?? TONE_STYLES.playful;
+              return (
+                <div key={r.tone} style={{ background: s.bg, border: `1.5px solid ${s.color}25`, borderRadius: 16, padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <Pill label={`${s.emoji} ${r.tone}`} color={s.color} bg={`${s.color}18`} />
+                    <motion.button onClick={() => copy(r.message, r.tone)} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                      style={{ background: copied === r.tone ? `${C.green}15` : `${s.color}10`, border: `1px solid ${copied === r.tone ? C.green : s.color}30`, borderRadius: 8, padding: '5px 12px', fontSize: 11.5, fontWeight: 700, color: copied === r.tone ? C.green : s.color, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                      {copied === r.tone ? '✓ Copied' : 'Copy'}
+                    </motion.button>
+                  </div>
+                  <p style={{ fontSize: 17, color: C.ink, fontStyle: 'italic', lineHeight: 1.7, margin: '0 0 10px', fontFamily: 'Georgia, serif' }}>"{r.message}"</p>
+                  <p style={{ fontSize: 13.5, color: C.muted, lineHeight: 1.65, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{r.why}</p>
+                </div>
+              );
+            })}
+            <motion.button onClick={generate} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              disabled={loading}
+              style={{ background: 'none', border: `1px solid ${C.warm2}`, borderRadius: 11, padding: '10px 16px', color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", textAlign: 'center' }}>
+              Regenerate
+            </motion.button>
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function ResultsView({ result, context, onReset, isPaid }: { result: AnalysisResult; context: string; onReset: () => void; isPaid: boolean }) {
   const [tab, setTab] = useState<'analysis' | 'rewrites' | 'coach'>('analysis');
   const ctx = CONTEXTS.find(c => c.id === context)!;
   const sc = result.overallScore;
@@ -758,11 +813,27 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
             {result.replyEnergyMatch === 'low' && <Pill label="Low energy" color={C.red} bg={`${C.red}12`} />}
             {result.replyEnergyMatch === 'high' && <Pill label="Over-investing" color={C.amber} bg={`${C.amber}12`} />}
             {result.tags?.slice(0, 3).map((t, i) => <Pill key={i} label={t.replace(/-/g, ' ')} color={C.muted} bg={`${C.muted}12`} />)}
+            {result.conversationPersonalityType?.type && (
+              <Pill label={`${result.conversationPersonalityType.emoji} ${result.conversationPersonalityType.type}`} color={C.teal} bg={`${C.teal}18`} />
+            )}
           </div>
         </div>
       </Fade>
 
-      <Fade delay={0.08}><ShareCard result={result} /></Fade>
+      <Fade delay={0.08}>
+        <ShareScoreCard
+          score={result.overallScore}
+          interestLevel={result.interestLevel}
+          attractionProbability={result.attractionProbability}
+          momentum={result.conversationMomentum}
+          verdict={result.layer1_diagnosis?.verdict || ''}
+          personalityType={result.conversationPersonalityType?.type}
+          personalityEmoji={result.conversationPersonalityType?.emoji}
+          tags={result.tags}
+          roastText={result.roastText}
+          isRoast={result.roastMode}
+        />
+      </Fade>
 
       {/* Diagnosis card — cream */}
       <Fade delay={0.10}>
@@ -837,6 +908,7 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
             </Section>
 
             {result.layer4_powerDynamics?.analysis && (
+              isPaid ? (
               <Section title="Power Dynamics" accent={C.amber} badge={<Pill label={`${result.layer4_powerDynamics.whoHoldsPower} holds power`} color={C.amber} bg={`${C.amber}15`} />}>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', paddingTop: 16 }}>
                   {[{ label: 'Power', val: result.layer4_powerDynamics.whoHoldsPower }, { label: 'Chasing', val: result.layer4_powerDynamics.whoIsChasing }, { label: 'Leading', val: result.layer4_powerDynamics.whoIsLeading }].map(item => (
@@ -853,9 +925,13 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                   </div>
                 )}
               </Section>
+              ) : (
+              <PremiumGate title="Power Dynamics" description="See who holds power, who is chasing, and how to rebalance." compact />
+              )
             )}
 
             {result.layer3_psychSignals?.filter(s => s.detected).length > 0 && (
+              isPaid ? (
               <Section title="Psychological Signals" accent={C.teal} badge={<Pill label={`${result.layer3_psychSignals.filter(s => s.detected).length} detected`} color={C.teal} bg="rgba(58,122,138,0.12)" />}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 16 }}>
                   {result.layer3_psychSignals.filter(s => s.detected).map((s, i) => (
@@ -867,9 +943,13 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                   ))}
                 </div>
               </Section>
+              ) : (
+              <PremiumGate title="Psychological Signals" description={`${result.layer3_psychSignals.filter(s => s.detected).length} signals detected. Upgrade to see mirroring, breadcrumbing, and more.`} compact />
+              )
             )}
 
             {result.layer8_attractionSignals?.length > 0 && (
+              isPaid ? (
               <Section title="Attraction Signals" accent="#A0426E">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingTop: 16 }}>
                   {result.layer8_attractionSignals.map((sig, i) => (
@@ -884,12 +964,15 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                   ))}
                 </div>
               </Section>
+              ) : (
+              <PremiumGate title="Attraction Signals" description={`${result.layer8_attractionSignals.length} attraction signals found. Upgrade to see positive, negative, and neutral indicators.`} compact />
+              )
             )}
 
             {result.layer5_mistakes?.length > 0 && (
               <Section title="Mistakes Made" accent={C.red} badge={<Pill label={`${result.layer5_mistakes.length} found`} color={C.red} bg={`${C.red}12`} />}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingTop: 16 }}>
-                  {result.layer5_mistakes.map((m, i) => (
+                  {(isPaid ? result.layer5_mistakes : result.layer5_mistakes.slice(0, 1)).map((m, i) => (
                     <div key={i}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 9, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 15, fontWeight: 800, color: SEV_C[m.severity] ?? C.red, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{m.mistake}</span>
@@ -899,8 +982,33 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                       <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{m.whyItHurts}</p>
                     </div>
                   ))}
+                  {!isPaid && result.layer5_mistakes.length > 1 && (
+                    <PremiumGate title={`+${result.layer5_mistakes.length - 1} more mistakes`} description="Upgrade to see all mistakes and how to fix them." compact />
+                  )}
                 </div>
               </Section>
+            )}
+
+            {result.redFlags && result.redFlags.length > 0 && (
+              isPaid ? (
+              <Section title="Red Flags Detected" accent={C.red} badge={<Pill label={`${result.redFlags.length} warning${result.redFlags.length > 1 ? 's' : ''}`} color={C.red} bg={`${C.red}12`} />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18, paddingTop: 16 }}>
+                  {result.redFlags.map((rf, i) => (
+                    <div key={i} style={{ background: `${C.red}06`, border: `1.5px solid ${C.red}20`, borderRadius: 14, padding: '16px 18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                        <span style={{ fontSize: 14 }}>🚩</span>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: C.red, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{rf.pattern}</span>
+                        <Pill label={rf.severity} color={SEV_C[rf.severity] ?? C.red} bg={`${SEV_C[rf.severity] ?? C.red}12`} />
+                      </div>
+                      {rf.evidence && <p style={{ fontSize: 13, color: C.mutedLt, fontStyle: 'italic', margin: '0 0 8px', fontFamily: "'DM Sans', sans-serif" }}>"{rf.evidence}"</p>}
+                      <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.75, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{rf.advice}</p>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+              ) : (
+              <PremiumGate title="Red Flags Detected" description={`${result.redFlags.length} potential red flag${result.redFlags.length > 1 ? 's' : ''} found. Upgrade to see warnings like breadcrumbing, mixed signals, and more.`} compact />
+              )
             )}
 
             {result.layer6_missedOpportunities?.length > 0 && (
@@ -921,6 +1029,7 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
             )}
 
             {result.layer10_strategy?.doThis && (
+              isPaid ? (
               <Section title="Strategy & Next Steps" accent={C.green} defaultOpen>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingTop: 16 }}>
                   {result.layer10_strategy.doThis && (
@@ -942,6 +1051,9 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                   )}
                 </div>
               </Section>
+              ) : (
+              <PremiumGate title="Strategy & Next Steps" description="Get personalized do's, don'ts, and long-term advice based on this conversation." compact />
+              )
             )}
           </motion.div>
         )}
@@ -997,6 +1109,9 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
                 </div>
               </Section>
             )}
+
+            {/* Smart Reply Generator — Premium */}
+            <SmartReplySection extractedText={result.extractedText} context={context} score={result.overallScore} isPaid={isPaid} />
           </motion.div>
         )}
 
@@ -1006,10 +1121,30 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
             <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.8, margin: '0 0 16px', fontFamily: "'DM Sans', sans-serif" }}>
               Draft your next message and get an instant verdict — send it, tweak it, or scrap it.
             </p>
-            <LiveCoach extractedText={result.extractedText} context={context} />
+            <LiveCoach extractedText={result.extractedText} context={context} isPaid={isPaid} />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Share Score Card */}
+      <Fade delay={0.28}>
+        <Section title="Share Your Score" accent={C.red}>
+          <div style={{ paddingTop: 14 }}>
+            <ShareScoreCard
+              score={result.overallScore}
+              interestLevel={result.interestLevel}
+              attractionProbability={result.attractionProbability}
+              momentum={result.conversationMomentum}
+              verdict={result.layer1_diagnosis?.verdict || ''}
+              personalityType={result.conversationPersonalityType?.type}
+              personalityEmoji={result.conversationPersonalityType?.emoji}
+              tags={result.tags}
+              roastText={result.roastText}
+              isRoast={result.roastMode}
+            />
+          </div>
+        </Section>
+      </Fade>
 
       <Fade delay={0.3}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingTop: 8 }}>
@@ -1033,10 +1168,15 @@ function ResultsView({ result, context, onReset }: { result: AnalysisResult; con
 type Step = 'context' | 'upload' | 'loading' | 'result' | 'error';
 
 export default function UploadPage() {
+  const { data: session } = useSession();
+  const isPaid = checkPremium(session);
   const [step, setStep] = useState<Step>('context');
   const [context, setContext] = useState('dating');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallMsg, setPaywallMsg] = useState('');
+  const [showAdModal, setShowAdModal] = useState(false);
 
   const runAnalysis = async (file: File | null, text: string | null, lang: string, roast: boolean, userSide = 'auto') => {
     setStep('loading'); setError(null);
@@ -1048,6 +1188,15 @@ export default function UploadPage() {
       fd.append('roastMode', String(roast)); fd.append('userSide', userSide);
       const res = await fetch('/api/analyze', { method: 'POST', body: fd });
       const data = await res.json();
+
+      // ── Paywall handling: show upgrade modal, NOT error screen ──
+      if (data.premiumRequired || data.error === 'paywall') {
+        setPaywallMsg(data.message || 'You\'ve reached the free analysis limit. Upgrade to Premium for unlimited analysis.');
+        setShowPaywall(true);
+        setStep('upload'); // go back to upload, not error
+        return;
+      }
+
       if (!res.ok || !data.success) { setError(data.error || 'Analysis failed.'); setStep('error'); return; }
       setResult(data); setStep('result');
     } catch (e: any) { setError(e.message || 'Something went wrong.'); setStep('error'); }
@@ -1088,7 +1237,7 @@ export default function UploadPage() {
               {step === 'context' && <StepContext onNext={ctx => { setContext(ctx); setStep('upload'); }} />}
               {step === 'upload' && <StepUpload context={context} onBack={() => setStep('context')} onAnalyze={runAnalysis} />}
               {step === 'loading' && <LoadingView />}
-              {step === 'result' && result && <ResultsView result={result} context={context} onReset={reset} />}
+              {step === 'result' && result && <ResultsView result={result} context={context} onReset={reset} isPaid={isPaid} />}
               {step === 'error' && (
                 <div style={{ textAlign: 'center', padding: '80px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 20 }}>😬</div>
@@ -1114,6 +1263,26 @@ export default function UploadPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Paywall Modal — shows when free limit reached */}
+      <PremiumModal
+        open={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        type={session?.user ? 'upgrade' : 'signup'}
+        title="You've reached the free analysis limit"
+        subtitle={paywallMsg}
+        onWatchAd={() => { setShowPaywall(false); setShowAdModal(true); }}
+      />
+
+      {/* Reward Ad Modal */}
+      <RewardAdModal
+        open={showAdModal}
+        onClose={() => setShowAdModal(false)}
+        onRewardGranted={() => {
+          setShowAdModal(false);
+          setShowPaywall(false);
+        }}
+      />
     </>
   );
 }

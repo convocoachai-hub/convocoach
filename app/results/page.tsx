@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSession } from 'next-auth/react';
+import { isPremium } from '@/lib/premiumUtils';
 
 interface AnalysisResult {
   conversationScore: number;
@@ -101,6 +103,7 @@ function BarScore({ label, value, color }: { label: string; value: number; color
 
 export default function ResultsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [tab, setTab] = useState<'scores' | 'feedback' | 'moves'>('scores');
 
@@ -118,7 +121,7 @@ export default function ResultsPage() {
 
   const momentum = MOMENTUM_CONFIG[results.conversationMomentum] || MOMENTUM_CONFIG.neutral;
   const energy = ENERGY_CONFIG[results.replyEnergyMatch] || ENERGY_CONFIG.matched;
-  const isPaid = false; // Replace with real session check
+  const isPaid = isPremium(session);
 
   return (
     <div className="min-h-screen bg-[var(--bg-void)] px-4 py-16 pb-28 md:pb-16">

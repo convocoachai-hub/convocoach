@@ -19,23 +19,35 @@ const C = {
 };
 
 const FOOTER_LINKS = {
-  Product: [
-    { label: 'Analyze Chat',  href: '/upload'   },
-    { label: 'Practice Mode', href: '/practice' },
-    { label: 'Examples',      href: '/examples' },
-    { label: 'Pricing',       href: '/upgrade'  },
+  Features: [
+    { label: 'Analyze Chat',        href: '/upload'   },
+    { label: 'Practice Mode',       href: '/practice' },
+    { label: 'Examples',            href: '/examples' },
+    { label: 'Pricing',             href: '/upgrade'  },
+    { label: 'Conversation Score',  href: '/conversation-score' },
+    { label: 'Roast Mode',          href: '/roast-mode' },
   ],
   Resources: [
-    { label: 'Dating Psychology',  href: '#' },
-    { label: 'Texting Guides',     href: '#' },
-    { label: 'Attraction Signals', href: '#' },
-    { label: 'Help Center',        href: '#' },
+    { label: 'Dating Psychology',     href: '/resources/dating-psychology' },
+    { label: 'Texting Guides',        href: '/resources/texting-guides' },
+    { label: 'Attraction Signals',    href: '/resources/attraction-signals' },
+    { label: 'Flirting Over Text',    href: '/resources/flirting-over-text' },
+    { label: 'Stop Dry Texting',      href: '/resources/stop-dry-texting' },
+    { label: 'Conversation Examples', href: '/resources/conversation-examples' },
+  ],
+  Support: [
+    { label: 'Help Center',       href: '/help-center' },
+    { label: 'FAQ',                href: '/faq' },
+    { label: 'Report a Bug',      href: '/report-bug' },
+    { label: 'Feature Requests',  href: '/feature-requests' },
+    { label: 'System Status',     href: '/status' },
   ],
   Company: [
-    { label: 'About Us',       href: '#' },
-    { label: 'Contact',        href: '#' },
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms',          href: '#' },
+    { label: 'About Us',       href: '/about' },
+    { label: 'Contact',        href: '/contact' },
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms',          href: '/terms' },
+    { label: 'Cookie Policy',  href: '/cookie-policy' },
   ],
 };
 

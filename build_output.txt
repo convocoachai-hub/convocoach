@@ -1,0 +1,167 @@
+﻿  Γû▓ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+node.exe :  ΓÜá Using edge 
+runtime on a page currently 
+disables static generation for 
+that page
+At C:\Program 
+Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS 
+$args
++   
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: ( ΓÜá Using ed  
+  ge...n for that page:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+   Generating static pages (0/54) ...
+Rizz summary error: n [Error]: 
+Dynamic server usage: Route 
+/api/rizz-feedback/summary 
+couldn't be rendered statically 
+because it used `headers`. See 
+more info here: https://nextjs.o
+rg/docs/messages/dynamic-server-
+error
+    at l (C:\Users\ariha\Downloa
+ds\WALLPAPER\AiCoach\convocoach\
+.next\server\chunks\8948.js:1:37
+220)
+    at d (C:\Users\ariha\Downloa
+ds\WALLPAPER\AiCoach\convocoach\
+.next\server\chunks\647.js:25:26
+822)
+    at s (C:\Users\ariha\Downloa
+ds\WALLPAPER\AiCoach\convocoach\
+.next\server\chunks\647.js:25:19
+584)
+    at g (C:\Users\ariha\Downloa
+ds\WALLPAPER\AiCoach\convocoach\
+.next\server\app\api\rizz-feedba
+ck\summary\route.js:1:1379)
+    at C:\Users\ariha\Downloads\
+WALLPAPER\AiCoach\convocoach\nod
+e_modules\next\dist\compiled\nex
+t-server\app-route.runtime.prod.
+js:6:38417
+    at C:\Users\ariha\Downloads\
+WALLPAPER\AiCoach\convocoach\nod
+e_modules\next\dist\server\lib\t
+race\tracer.js:140:36
+    at NoopContextManager.with (
+C:\Users\ariha\Downloads\WALLPAP
+ER\AiCoach\convocoach\node_modul
+es\next\dist\compiled\@opentelem
+etry\api\index.js:1:7062)
+    at ContextAPI.with (C:\Users
+\ariha\Downloads\WALLPAPER\AiCoa
+ch\convocoach\node_modules\next\
+dist\compiled\@opentelemetry\api
+\index.js:1:518)
+    at 
+NoopTracer.startActiveSpan (C:\U
+sers\ariha\Downloads\WALLPAPER\A
+iCoach\convocoach\node_modules\n
+ext\dist\compiled\@opentelemetry
+\api\index.js:1:18093)
+    at 
+ProxyTracer.startActiveSpan (C:\
+Users\ariha\Downloads\WALLPAPER\
+AiCoach\convocoach\node_modules\
+next\dist\compiled\@opentelemetr
+y\api\index.js:1:18854) {
+  description: "Route 
+/api/rizz-feedback/summary 
+couldn't be rendered statically 
+because it used `headers`. See 
+more info here: https://nextjs.o
+rg/docs/messages/dynamic-server-
+error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+   Generating static pages (13/54) 
+   Generating static pages (26/54) 
+   Generating static pages (40/54) 
+ Γ£ô Generating static pages (54/54)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+Γöî Γùï /                                    10.7 kB         154 kB
+Γö£ Γùï /_not-found                          880 B          88.5 kB
+Γö£ Γùï /about                               3.38 kB         142 kB
+Γö£ Γùï /admin                               14.6 kB         153 kB
+Γö£ ╞Æ /api/ad-reward                       0 B                0 B
+Γö£ ╞Æ /api/admin                           0 B                0 B
+Γö£ ╞Æ /api/admin/submissions               0 B                0 B
+Γö£ ╞Æ /api/admin/users/[id]                0 B                0 B
+Γö£ ╞Æ /api/analyze                         0 B                0 B
+Γö£ ╞Æ /api/auth/[...nextauth]              0 B                0 B
+Γö£ ╞Æ /api/bug-reports                     0 B                0 B
+Γö£ ╞Æ /api/coach                           0 B                0 B
+Γö£ ╞Æ /api/contact                         0 B                0 B
+Γö£ ╞Æ /api/dashboard                       0 B                0 B
+Γö£ ╞Æ /api/feature-requests                0 B                0 B
+Γö£ ╞Æ /api/generate-reply                  0 B                0 B
+Γö£ ╞Æ /api/og                              0 B                0 B
+Γö£ ╞Æ /api/payment/create-order            0 B                0 B
+Γö£ ╞Æ /api/payment/verify                  0 B                0 B
+Γö£ ╞Æ /api/practice                        0 B                0 B
+Γö£ ╞Æ /api/profile/[username]              0 B                0 B
+Γö£ ╞Æ /api/rizz-config                     0 B                0 B
+Γö£ ╞Æ /api/rizz-feedback                   0 B                0 B
+Γö£ ╞Æ /api/rizz-feedback/summary           0 B                0 B
+Γö£ ╞Æ /api/username                        0 B                0 B
+Γö£ Γùï /auth/signin                         1.72 kB         140 kB
+Γö£ Γùï /contact                             4 kB            133 kB
+Γö£ Γùï /conversation-score                  2.95 kB         141 kB
+Γö£ Γùï /cookie-policy                       2.31 kB         132 kB
+Γö£ Γùï /dashboard                           15.1 kB         165 kB
+Γö£ Γùï /examples                            9.33 kB         153 kB
+Γö£ ΓùÅ /examples/[slug]                     178 B          96.5 kB
+Γö£   Γö£ /examples/flirty-texting
+Γö£   Γö£ /examples/dry-texting
+Γö£   Γö£ /examples/ghosting
+Γö£   Γöö /examples/high-attraction
+Γö£ Γùï /faq                                 5.36 kB         144 kB
+Γö£ Γùï /feature-requests                    2.18 kB         132 kB
+Γö£ Γùï /help-center                         5.97 kB         135 kB
+Γö£ Γùï /icon.png                            0 B                0 B
+Γö£ Γùï /practice                            6.26 kB         145 kB
+Γö£ Γùï /privacy                             2.99 kB         132 kB
+Γö£ Γùï /report-bug                          2.21 kB         132 kB
+Γö£ Γùï /resources                           3.09 kB         141 kB
+Γö£ Γùï /resources/attraction-signals        3.82 kB         142 kB
+Γö£ Γùï /resources/conversation-examples     3.38 kB         142 kB
+Γö£ Γùï /resources/dating-psychology         3.58 kB         142 kB
+Γö£ Γùï /resources/flirting-over-text        4.15 kB         142 kB
+Γö£ Γùï /resources/stop-dry-texting          3.08 kB         141 kB
+Γö£ Γùï /resources/texting-guides            4.74 kB         143 kB
+Γö£ Γùï /results                             3.32 kB         153 kB
+Γö£ Γùï /roast-mode                          2.79 kB         141 kB
+Γö£ Γùï /robots.txt                          0 B                0 B
+Γö£ Γùï /sitemap.xml                         0 B                0 B
+Γö£ Γùï /status                              2.03 kB         131 kB
+Γö£ Γùï /terms                               3.17 kB         133 kB
+Γö£ ╞Æ /u/[username]                        5.2 kB          146 kB
+Γö£ Γùï /upgrade                             8.35 kB         150 kB
+Γöö Γùï /upload                              18 kB           167 kB
++ First Load JS shared by all            87.6 kB
+  Γö£ chunks/2117-d86cbc7c52962e33.js      31.9 kB
+  Γö£ chunks/fd9d1056-08c28c1f39be9001.js  53.6 kB
+  Γöö other shared chunks (total)          2.07 kB
+
+
+Γùï  (Static)   prerendered as static content
+ΓùÅ  (SSG)      prerendered as static HTML (uses getStaticProps)
+╞Æ  (Dynamic)  server-rendered on demand
+

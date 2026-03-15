@@ -6,6 +6,20 @@ export interface IUser extends Document {
   name: string;
   image?: string;
 
+  // Username for Rizz Links
+  username?: string;
+  usernameSetAt?: Date;
+
+  // Rizz Link Page Configuration
+  rizzPageConfig?: {
+    avatar: string;
+    theme: 'minimal' | 'vintage' | 'gothic';
+    enabledTraits: string[];
+    allowMessage: boolean;
+    customQuestion?: string;
+    showFinalCTA: boolean;
+  };
+
   // Free tier tracking
   freeTriesUsed: number;
 
@@ -14,8 +28,9 @@ export interface IUser extends Document {
   subscriptionExpiry?: Date;
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
+  planType?: string;
 
-  // Skill system (harder to level up)
+  // Skill system
   skillPoints: number;
   analysisCount: number;
   practiceMessageCount: number;
@@ -25,11 +40,23 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
+const RizzPageConfigSchema = new mongoose.Schema({
+  avatar:        { type: String, default: 'cat' },
+  theme:         { type: String, default: 'minimal', enum: ['minimal', 'vintage', 'gothic'] },
+  enabledTraits: { type: [String], default: ['flirting', 'humor', 'confidence', 'dryText', 'overall'] },
+  allowMessage:  { type: Boolean, default: true },
+  customQuestion:{ type: String, maxlength: 200 },
+  showFinalCTA:  { type: Boolean, default: true },
+}, { _id: false });
+
 const UserSchema = new mongoose.Schema<IUser>(
   {
     email:  { type: String, required: true, unique: true, lowercase: true, trim: true },
     name:   { type: String, required: true },
     image:  { type: String },
+
+    username:      { type: String, unique: true, sparse: true, trim: true, lowercase: true },
+    usernameSetAt: { type: Date },
 
     freeTriesUsed:    { type: Number, default: 0 },
 
@@ -37,6 +64,9 @@ const UserSchema = new mongoose.Schema<IUser>(
     subscriptionExpiry: { type: Date },
     razorpayPaymentId:  { type: String },
     razorpayOrderId:    { type: String },
+    planType:           { type: String },
+
+    rizzPageConfig: { type: RizzPageConfigSchema, default: () => ({}) },
 
     // Skill points - max 30/analysis, max 5/practice message
     // Level thresholds: Dry Texter 0 | Average 200 | Smooth 600 | Elite 1500

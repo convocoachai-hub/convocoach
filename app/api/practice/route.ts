@@ -79,23 +79,32 @@ const CHARACTERS: Record<string, { prompt: string; category: string; opening: st
 
 function buildCoachPrompt(userMsg: string, charReply: string, charType: string, category: string, history: { role: string; content: string }[]): string {
   const recent = history.slice(-8).map(m => `${m.role === 'user' ? 'USER' : 'CHAR'}: ${m.content}`).join('\n');
-  return `You are an elite ${category === 'professional' ? 'professional communication' : 'social dynamics'} coach.
-CHARACTER: ${charType}
-RECENT CONVERSATION:
-${recent}
-USER SENT: ${userMsg}
-CHARACTER REPLIED: ${charReply}
+  
+  return `You are an elite expert in ${category === 'professional' ? 'high-stakes business communication' : 'social intelligence and modern dating dynamics'}.
+  
+  CONTEXT:
+  - Character Persona: ${charType}
+  - Recent History: ${recent}
+  - User's Last Message: "${userMsg}"
+  - Character's Reaction: "${charReply}"
 
-Return ONLY valid JSON (no markdown):
-{
-  "score": <integer 0-100>,
-  "interestChange": <integer -15 to 20>,
-  "momentumChange": <integer -10 to 15>,
-  "whatWorked": <string max 15 words or null>,
-  "whatFailed": <string max 15 words or null>,
-  "tip": <string max 20 words, ONE actionable next-message tip>,
-  "flags": <array from: ["too_eager","no_question","generic","good_hook","good_question","witty","needy","specific","boring","good_follow_up","low_effort","high_effort","showed_personality","deep_question","matched_energy","misread_vibe","recovered_well"]>
-}`;
+  TASK: Provide a brutal, high-level analysis of the User's text. 
+  Instead of generic advice, tell them exactly WHY the character reacted that way and how to pivot.
+
+  Return ONLY valid JSON:
+  {
+    "score": <0-100>,
+    "interestChange": <integer -15 to 20>,
+    "momentumChange": <integer -10 to 15>,
+    "vibeCheck": "<string: describe the current mood in 5 words>",
+    "analysis": {
+       "strengths": ["list 1-2 specific things they did right"],
+       "weaknesses": ["list 1-2 specific things that killed the vibe"],
+       "subtext": "What is the user subconsciously communicating? (e.g., 'You sound too available' or 'You are being too formal')"
+    },
+    "proMove": "Give a specific, high-level example of what they could have said instead or what to say next to maximize impact.",
+    "flags": ["too_eager", "witty", "matched_energy", etc]
+  }`;
 }
 
 export async function POST(request: NextRequest) {
@@ -126,8 +135,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Generate Character Reply
+    const ANTI_COACHING = `\n\nCRITICAL RULES — NEVER BREAK THESE:\n- You are ONLY this character. You are NOT a coach, therapist, or advisor.\n- NEVER give tips, suggestions, or feedback on how the user is texting.\n- NEVER say things like "nice message" or "good question" or "that's a great way to..." — real people don't do that.\n- NEVER break character to explain yourself or your reactions.\n- If the user says something boring, just respond boringly — don't explain WHY it was boring.\n- React naturally and authentically as a REAL person would in a REAL conversation.`;
+
     const groqMsgs: Groq.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: char.prompt },
+      { role: 'system', content: char.prompt + ANTI_COACHING },
       ...history.slice(-20).map((m: { role: string; content: string }) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
@@ -152,8 +163,8 @@ export async function POST(request: NextRequest) {
         const coachCompletion = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: buildCoachPrompt(trimmed, aiReply, characterId, char.category, history) }],
-          temperature: 0.25,
-          max_tokens: 400,
+          temperature: 0.4, // Slightly higher for more creative/varied feedback
+          max_tokens: 600,
           response_format: { type: "json_object" }
         });
         const raw = coachCompletion.choices[0]?.message?.content?.trim() ?? '';
@@ -161,11 +172,14 @@ export async function POST(request: NextRequest) {
         
         analysis = {
           score: Math.max(0, Math.min(100, Number(p.score) || 50)),
-          interestChange: Math.max(-15, Math.min(20, Number(p.interestChange) || 0)),
-          momentumChange: Math.max(-10, Math.min(15, Number(p.momentumChange) || 0)),
-          whatWorked: p.whatWorked || null,
-          whatFailed: p.whatFailed || null,
-          tip: p.tip || '',
+          interestChange: Number(p.interestChange) || 0,
+          momentumChange: Number(p.momentumChange) || 0,
+          vibeCheck: p.vibeCheck || 'Neutral',
+          // New Detailed Fields
+          strengths: p.analysis?.strengths || [],
+          weaknesses: p.analysis?.weaknesses || [],
+          subtext: p.analysis?.subtext || '',
+          proMove: p.proMove || '',
           flags: Array.isArray(p.flags) ? p.flags : [],
         };
       } catch (err) {

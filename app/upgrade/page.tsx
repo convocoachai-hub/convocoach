@@ -18,32 +18,51 @@ const C = {
   muted:   '#8A8074',
   mutedLt: '#BFB8AC',
   amber:   '#B87A10',
+  green:   '#2D8A4E',
 };
 
 // ─── PRICES ───────────────────────────────────────────────────────────────────
-const PRICES: Record<string, { symbol: string; text: string }> = {
-  INR: { symbol: '₹',   text: '99'   },
-  USD: { symbol: '$',   text: '1.99' },
-  EUR: { symbol: '€',   text: '1.99' },
-  GBP: { symbol: '£',   text: '1.79' },
-  CAD: { symbol: '$',   text: '2.69' },
-  AUD: { symbol: '$',   text: '2.99' },
-  JPY: { symbol: '¥',   text: '300'  },
-  SGD: { symbol: '$',   text: '2.69' },
-  AED: { symbol: 'د.إ', text: '7.30' },
-  BRL: { symbol: 'R$',  text: '9.90' },
-  MXN: { symbol: '$',   text: '34'   },
+interface PriceTier { symbol: string; monthly: string; yearly: string; lifetime: string }
+const PRICES: Record<string, PriceTier> = {
+  INR: { symbol: '₹',   monthly: '99',   yearly: '1,000', lifetime: '3,999' },
+  USD: { symbol: '$',   monthly: '1.99', yearly: '19.99', lifetime: '69.99' },
+  EUR: { symbol: '€',   monthly: '1.99', yearly: '19.99', lifetime: '69.99' },
+  GBP: { symbol: '£',   monthly: '1.79', yearly: '17.99', lifetime: '59.99' },
+  CAD: { symbol: '$',   monthly: '2.69', yearly: '26.99', lifetime: '89.99' },
+  AUD: { symbol: '$',   monthly: '2.99', yearly: '29.99', lifetime: '99.99' },
+  JPY: { symbol: '¥',   monthly: '300',  yearly: '2,980', lifetime: '9,980' },
+  SGD: { symbol: '$',   monthly: '2.69', yearly: '26.99', lifetime: '89.99' },
+  AED: { symbol: 'د.إ', monthly: '7.30', yearly: '73',    lifetime: '249'   },
+  BRL: { symbol: 'R$',  monthly: '9.90', yearly: '99.90', lifetime: '349'   },
+  MXN: { symbol: '$',   monthly: '34',   yearly: '339',   lifetime: '1,199' },
 };
 
 const COMPARISON = [
-  { feature: 'Chat analyses',       free: '4 total',  pro: 'Unlimited'    },
-  { feature: 'Attraction score',    free: 'Basic',    pro: 'Full + history'},
-  { feature: 'Missed signals',      free: false,      pro: true            },
-  { feature: 'AI reply rewrites',   free: false,      pro: true            },
-  { feature: 'Practice characters', free: '2 only',   pro: 'All 10'       },
-  { feature: 'Momentum meter',      free: false,      pro: true            },
-  { feature: 'Expert difficulty',   free: false,      pro: true            },
-  { feature: 'Priority support',    free: false,      pro: true            },
+  // Core Analysis
+  { feature: 'Chat analyses',            free: '5 total',  pro: 'Unlimited' },
+  { feature: 'Attraction score',         free: 'Basic',    pro: 'Full + history' },
+  { feature: 'Conversation diagnosis',   free: true,       pro: true },
+  { feature: 'Score breakdown (8 areas)', free: 'Summary',  pro: 'Full detail' },
+  // Premium Analysis Layers
+  { feature: 'Psychological signals',    free: false,      pro: true },
+  { feature: 'Power dynamics',           free: false,      pro: true },
+  { feature: 'Missed opportunities',     free: '1 shown',  pro: 'All shown' },
+  { feature: 'AI reply rewrites',        free: '1 style',  pro: '3 styles' },
+  { feature: 'Attraction signals',       free: false,      pro: true },
+  { feature: 'Strategy & next steps',    free: false,      pro: true },
+  { feature: 'Red flag detection',       free: false,      pro: true },
+  { feature: 'Personality type analysis', free: false,      pro: true },
+  { feature: 'Smart reply generator',    free: false,      pro: true },
+  // Practice Mode
+  { feature: 'Practice characters',      free: '2 only',   pro: 'All 10+' },
+  { feature: 'Difficulty levels',        free: 'Easy only', pro: 'Easy–Hard' },
+  { feature: 'Messages per session',     free: '25',        pro: 'Unlimited' },
+  // Coaching & Dashboard
+  { feature: 'Live AI coaching',         free: '3 checks',  pro: 'Unlimited' },
+  { feature: 'Dashboard score trends',   free: false,       pro: true },
+  { feature: 'Score history',            free: false,       pro: true },
+  { feature: 'Ad-free experience',       free: false,       pro: true },
+  { feature: 'Priority support',         free: false,       pro: true },
 ];
 
 const TESTIMONIALS = [
@@ -217,7 +236,7 @@ export default function UpgradePage() {
   const currency = useCurrency();
   const price = PRICES[currency] || PRICES['USD'];
 
-  const handlePayment = async () => {
+  const handlePayment = async (planType: 'monthly' | 'yearly' | 'lifetime' = 'monthly') => {
     if (!session?.user) { signIn('google', { callbackUrl: '/upgrade' }); return; }
     setLoading(true);
     try {
@@ -226,19 +245,19 @@ export default function UpgradePage() {
       document.body.appendChild(script);
       const order = await fetch('/api/payment/create-order', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currency }),
+        body: JSON.stringify({ currency, planType }),
       }).then(r => r.json());
       if (!order.orderId) throw new Error('No order');
       await new Promise<void>(res => { script.onload = () => res(); });
       new window.Razorpay({
         key: order.keyId, amount: order.amount, currency: order.currency,
-        name: 'ConvoCoach', order_id: order.orderId,
+        name: 'ConvoCoach', description: order.description, order_id: order.orderId,
         prefill: { name: session.user.name, email: session.user.email },
         theme: { color: C.red },
         handler: async (response: any) => {
           const r = await fetch('/api/payment/verify', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(response),
+            body: JSON.stringify({ ...response, planType }),
           }).then(r => r.json());
           if (r.success) router.push('/payment-success');
         },
@@ -252,8 +271,8 @@ export default function UpgradePage() {
   const h2Style: React.CSSProperties = { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 52, fontWeight: 900, color: C.ink, margin: '16px 0 48px', letterSpacing: '-0.03em', lineHeight: 1.02 };
   const wrap: React.CSSProperties = { padding: '80px 24px', maxWidth: 1120, margin: '0 auto' };
 
-  const RedBtn = ({ label: btnLabel, full = false }: { label: string; full?: boolean }) => (
-    <motion.button onClick={handlePayment} disabled={loading}
+  const RedBtn = ({ label: btnLabel, full = false, plan = 'monthly' as 'monthly' | 'yearly' | 'lifetime' }: { label: string; full?: boolean; plan?: 'monthly' | 'yearly' | 'lifetime' }) => (
+    <motion.button onClick={() => handlePayment(plan)} disabled={loading}
       whileHover={{ scale: 1.025, boxShadow: '0 10px 40px rgba(209,57,32,0.32)' }}
       whileTap={{ scale: 0.97 }}
       style={{
@@ -300,10 +319,10 @@ export default function UpgradePage() {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: `${C.cream}55`, letterSpacing: '0.1em', fontFamily: 'monospace', textTransform: 'uppercase' }}>launch price</div>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.cream, fontFamily: "'Bricolage Grotesque', sans-serif", lineHeight: 1.1 }}>
-            {price.symbol}{price.text}<span style={{ fontSize: 12, fontWeight: 400, color: `${C.cream}45`, marginLeft: 4 }}>/mo</span>
+            {price.symbol}{price.monthly}<span style={{ fontSize: 12, fontWeight: 400, color: `${C.cream}45`, marginLeft: 4 }}>/mo</span>
           </div>
         </div>
-        <button onClick={handlePayment} disabled={loading} style={{ background: C.red, color: '#fff', border: 'none', borderRadius: 12, padding: '13px 26px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif", flexShrink: 0 }}>
+        <button onClick={() => handlePayment('monthly')} disabled={loading} style={{ background: C.red, color: '#fff', border: 'none', borderRadius: 12, padding: '13px 26px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif", flexShrink: 0 }}>
           {loading ? 'Wait...' : 'Upgrade →'}
         </button>
       </div>
@@ -333,7 +352,7 @@ export default function UpgradePage() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 36, flexWrap: 'wrap' }}>
                 <RedBtn label={session ? 'Start Premium' : 'Sign in & Upgrade'} />
-                <span style={{ fontSize: 13, color: C.mutedLt }}>{price.symbol}{price.text}/mo · cancel anytime</span>
+                <span style={{ fontSize: 13, color: C.mutedLt }}>{price.symbol}{price.monthly}/mo · cancel anytime</span>
               </div>
 
               {/* Stats */}
@@ -514,34 +533,72 @@ export default function UpgradePage() {
                 </div>
               </motion.div>
 
-              {/* Right: card */}
+              {/* Right: pricing cards grid */}
               <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }} transition={{ delay: 0.15, duration: 0.7 }}>
-                <div style={{ background: C.cream, borderRadius: 24, padding: '36px 32px', boxShadow: '0 0 0 1px rgba(244,238,226,0.06), 0 40px 80px rgba(0,0,0,0.55)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: C.red, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 12 }}>
-                    ↯ Early adopter rate
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 76, fontWeight: 900, color: C.ink, letterSpacing: '-0.05em', lineHeight: 1 }}>
-                      {price.symbol}{price.text}
-                    </span>
-                    <span style={{ fontSize: 14, color: C.muted }}>/month</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: C.mutedLt, marginBottom: 28 }}>Billed monthly. Cancel anytime.</div>
+                viewport={{ once: true }} transition={{ delay: 0.15, duration: 0.7 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 310 }}>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginBottom: 28, paddingTop: 24, borderTop: `1px solid ${C.warm2}` }}>
-                    {['Unlimited chat analyses', 'Full 10-layer AI breakdown', 'Missed opportunity detector', 'AI reply rewrites', 'All 10 practice characters', 'Priority support'].map(f => (
-                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: C.ink }}>
-                        <Check style={{ width: 14, height: 14, color: C.red, flexShrink: 0 }} />
-                        {f}
+                {/* Monthly */}
+                <div style={{ background: C.cream, borderRadius: 20, padding: '28px 26px', boxShadow: '0 2px 16px rgba(0,0,0,0.08)', border: `1.5px solid ${C.warm2}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: C.muted, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 10 }}>Monthly</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 42, fontWeight: 900, color: C.ink, letterSpacing: '-0.04em', lineHeight: 1 }}>{price.symbol}{price.monthly}</span>
+                    <span style={{ fontSize: 13, color: C.muted }}>/mo</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.mutedLt, marginBottom: 18 }}>Billed monthly. Cancel anytime.</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, paddingTop: 16, borderTop: `1px solid ${C.warm2}` }}>
+                    {['Unlimited analyses', '10-layer AI breakdown', 'AI reply rewrites', 'All practice characters'].map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.ink }}>
+                        <Check style={{ width: 13, height: 13, color: C.red, flexShrink: 0 }} />{f}
                       </div>
                     ))}
                   </div>
+                  <RedBtn label={session ? 'Start Monthly' : 'Sign in to Upgrade'} full />
+                </div>
 
-                  <RedBtn label={session ? 'Upgrade Now' : 'Sign in to Upgrade'} full />
-                  <div style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: C.mutedLt }}>
-                    Secured by Razorpay · No card stored
+                {/* Yearly — highlighted */}
+                <div style={{ background: C.cream, borderRadius: 20, padding: '28px 26px', boxShadow: '0 0 0 2px ' + C.red + ', 0 8px 32px rgba(209,57,32,0.15)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: -12, right: 20, background: C.red, color: '#fff', fontSize: 10, fontWeight: 800, padding: '5px 14px', borderRadius: 20, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'monospace' }}>Most Popular</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: C.red, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 10 }}>Yearly</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 42, fontWeight: 900, color: C.ink, letterSpacing: '-0.04em', lineHeight: 1 }}>{price.symbol}{price.yearly}</span>
+                    <span style={{ fontSize: 13, color: C.muted }}>/year</span>
                   </div>
+                  <div style={{ fontSize: 12, color: C.green, fontWeight: 700, marginBottom: 18 }}>Save ~17% vs monthly</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, paddingTop: 16, borderTop: `1px solid ${C.warm2}` }}>
+                    {['Everything in Monthly', 'Score history & trends', 'Red flag detection', 'Smart reply generator', 'Priority support'].map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.ink }}>
+                        <Check style={{ width: 13, height: 13, color: C.red, flexShrink: 0 }} />{f}
+                      </div>
+                    ))}
+                  </div>
+                  <RedBtn label={session ? 'Start Yearly' : 'Sign in to Upgrade'} full />
+                </div>
+
+                {/* Lifetime */}
+                <div style={{ background: C.ink, borderRadius: 20, padding: '28px 26px', boxShadow: '0 8px 40px rgba(0,0,0,0.3)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: -12, right: 20, background: C.amber, color: '#fff', fontSize: 10, fontWeight: 800, padding: '5px 14px', borderRadius: 20, letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'monospace' }}>Best Value</div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: C.amber, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'monospace', marginBottom: 10 }}>Lifetime + Support Pack</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 42, fontWeight: 900, color: C.cream, letterSpacing: '-0.04em', lineHeight: 1 }}>{price.symbol}{price.lifetime}</span>
+                    <span style={{ fontSize: 13, color: `${C.cream}55` }}>one-time</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.amber, fontWeight: 700, marginBottom: 18 }}>Pay once, use forever</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, paddingTop: 16, borderTop: `1px solid rgba(255,255,255,0.1)` }}>
+                    {['Everything in Yearly', 'Lifetime access — no renewals', 'All future features included', 'Dedicated support channel', 'Early access to new features'].map(f => (
+                      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: `${C.cream}90` }}>
+                        <Check style={{ width: 13, height: 13, color: C.amber, flexShrink: 0 }} />{f}
+                      </div>
+                    ))}
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(184,122,16,0.35)' }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => handlePayment('lifetime')}
+                    style={{ width: '100%', padding: '15px 24px', borderRadius: 14, border: 'none', background: C.amber, color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque', sans-serif", boxShadow: '0 4px 20px rgba(184,122,16,0.25)' }}
+                  >
+                    {session ? 'Get Lifetime Access' : 'Sign in to Upgrade'}
+                  </motion.button>
                 </div>
               </motion.div>
             </div>
@@ -608,7 +665,7 @@ export default function UpgradePage() {
                 </p>
               </div>
               <div style={{ flexShrink: 0 }}>
-                <RedBtn label={`Premium — ${price.symbol}${price.text}/mo`} />
+                <RedBtn label={`Premium — ${price.symbol}${price.monthly}/mo`} />
                 <div style={{ marginTop: 10, fontSize: 12, color: C.mutedLt }}>Cancel anytime · No screenshots stored</div>
               </div>
             </div>

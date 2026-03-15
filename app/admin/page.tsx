@@ -460,6 +460,129 @@ function exportCSV(users: AdminUser[]) {
   a.click(); URL.revokeObjectURL(url);
 }
 
+// ─── SUBMISSIONS PANEL ────────────────────────────────────────────────────────
+function SubmissionsPanel() {
+  const [subTab, setSubTab] = useState<'contact' | 'bugs' | 'features'>('contact');
+  const [items, setItems] = useState<any[]>([]);
+  const [subLoading, setSubLoading] = useState(true);
+  const [subPage, setSubPage] = useState(1);
+  const [subTotal, setSubTotal] = useState(0);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3000); };
+
+  const loadSubs = async (type: string, page: number) => {
+    setSubLoading(true);
+    try {
+      const res = await fetch(`/api/admin/submissions?type=${type}&page=${page}`);
+      const json = await res.json();
+      if (json.success) { setItems(json.items); setSubTotal(json.pagination.total); }
+    } catch { showToast('Failed to load', false); }
+    finally { setSubLoading(false); }
+  };
+
+  useEffect(() => { loadSubs(subTab, subPage); }, [subTab, subPage]);
+
+  const handleAction = async (id: string, action: string) => {
+    try {
+      const res = await fetch('/api/admin/submissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type: subTab, action }),
+      });
+      const json = await res.json();
+      if (json.success) { showToast(json.message, true); loadSubs(subTab, subPage); }
+      else showToast(json.error || 'Failed', false);
+    } catch { showToast('Network error', false); }
+  };
+
+  const getContent = (item: any) => {
+    if (subTab === 'contact') return { primary: item.subject || 'No subject', secondary: item.message, meta: item.name };
+    if (subTab === 'bugs') return { primary: `Bug on ${item.page}`, secondary: item.description, meta: item.screenshotUrl ? 'Has screenshot' : '' };
+    return { primary: item.idea, secondary: item.description, meta: '' };
+  };
+
+  return (
+    <motion.div key="subs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+      <AnimatePresence>{toast && <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}><Toast msg={toast.msg} ok={toast.ok} /></div>}</AnimatePresence>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.muted, marginBottom: 5 }}>Inbox</div>
+        <h1 style={{ fontSize: 'clamp(22px,3.5vw,32px)', fontWeight: 800, letterSpacing: '-0.025em' }}>Submissions</h1>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+        {([['contact', '✉ Contact', T.indigoBr], ['bugs', '🐛 Bugs', T.red], ['features', '💡 Features', T.gold]] as const).map(([id, label, color]) => (
+          <button key={id} onClick={() => { setSubTab(id as any); setSubPage(1); }}
+            style={{ padding: '8px 16px', borderRadius: 10, background: subTab === id ? `${color}15` : T.surface, border: `1px solid ${subTab === id ? `${color}40` : T.border}`, color: subTab === id ? color : T.muted, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Count */}
+      <div className="mono" style={{ fontSize: 11, color: T.muted, marginBottom: 12 }}>{subTotal} total</div>
+
+      {subLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner /></div>
+      ) : items.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: T.muted, fontSize: 13 }}>No submissions yet</div>
+      ) : (
+        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden' }}>
+          {items.map((item, i) => {
+            const { primary, secondary, meta } = getContent(item);
+            const statusColor = item.status === 'resolved' || item.status === 'completed' ? T.green : item.status === 'open' || item.status === 'new' ? T.indigoBr : T.muted;
+            return (
+              <div key={item._id} style={{ padding: '16px 20px', borderBottom: i < items.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{primary}</div>
+                    <div className="mono" style={{ fontSize: 11, color: T.muted }}>{item.email}{meta ? ` · ${meta}` : ''}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span className="mono" style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 5, background: `${statusColor}15`, color: statusColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.status}</span>
+                    <span className="mono" style={{ fontSize: 10, color: T.muted }}>
+                      {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+                <p style={{ fontSize: 13, color: T.muted2, lineHeight: 1.6, marginBottom: 12, maxHeight: 60, overflow: 'hidden' }}>{secondary}</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {item.status !== 'resolved' && item.status !== 'completed' && (
+                    <button onClick={() => handleAction(item._id, 'resolve')}
+                      style={{ padding: '5px 12px', borderRadius: 7, background: T.greenLo, border: `1px solid ${T.green}40`, color: T.green, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                      ✓ Resolve
+                    </button>
+                  )}
+                  <button onClick={() => handleAction(item._id, 'delete')}
+                    style={{ padding: '5px 12px', borderRadius: 7, background: T.redLo, border: `1px solid ${T.red}40`, color: T.red, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    🗑 Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {subTotal > 20 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
+          <button disabled={subPage <= 1} onClick={() => setSubPage(p => p - 1)}
+            style={{ padding: '8px 16px', borderRadius: 8, background: T.surface, border: `1px solid ${T.border}`, color: T.text, fontSize: 12, cursor: 'pointer', opacity: subPage <= 1 ? 0.4 : 1 }}>
+            ← Prev
+          </button>
+          <span className="mono" style={{ fontSize: 12, color: T.muted, padding: '8px 0' }}>Page {subPage}</span>
+          <button disabled={subPage * 20 >= subTotal} onClick={() => setSubPage(p => p + 1)}
+            style={{ padding: '8px 16px', borderRadius: 8, background: T.surface, border: `1px solid ${T.border}`, color: T.text, fontSize: 12, cursor: 'pointer', opacity: subPage * 20 >= subTotal ? 0.4 : 1 }}>
+            Next →
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -468,7 +591,7 @@ export default function AdminPage() {
   const [hasAccess, setHasAccess] = useState(false);
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'users' | 'activity' | 'leaderboard'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'activity' | 'leaderboard' | 'submissions'>('overview');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -659,6 +782,7 @@ export default function AdminPage() {
               { id: 'users', label: 'Users', icon: '◉', count: data?.pagination.total },
               { id: 'activity', label: 'Activity', icon: '▲', count: null },
               { id: 'leaderboard', label: 'Leaderboard', icon: '★', count: null },
+              { id: 'submissions', label: 'Submissions', icon: '✉', count: null },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id as any)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 20px', background: tab === t.id ? T.indigoLo : 'transparent', border: 'none', borderLeft: `2px solid ${tab === t.id ? T.indigo : 'transparent'}`, color: tab === t.id ? T.indigoBr : T.muted, fontSize: 13, fontWeight: tab === t.id ? 700 : 400, textAlign: 'left', cursor: 'pointer', transition: 'all 0.14s', justifyContent: 'space-between' }}>
@@ -701,7 +825,7 @@ export default function AdminPage() {
         <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
           {/* Mobile tab strip */}
           <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, overflowX: 'auto', flexShrink: 0 }}>
-            {['overview', 'users', 'activity', 'leaderboard'].map(t => (
+            {['overview', 'users', 'activity', 'leaderboard', 'submissions'].map(t => (
               <button key={t} onClick={() => setTab(t as any)}
                 style={{ padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: `2px solid ${tab === t ? T.indigo : 'transparent'}`, color: tab === t ? T.indigoBr : T.muted, fontSize: 11, fontWeight: 700, textTransform: 'capitalize', letterSpacing: '0.06em', whiteSpace: 'nowrap', cursor: 'pointer' }}>
                 {t}
@@ -1091,6 +1215,9 @@ export default function AdminPage() {
                   </div>
                 </motion.div>
               )}
+
+              {/* ── SUBMISSIONS ────────────────────────────────────────────── */}
+              {tab === 'submissions' && <SubmissionsPanel />}
 
             </AnimatePresence>
           </div>

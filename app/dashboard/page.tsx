@@ -4,6 +4,22 @@ import { useEffect, useState, useRef } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import UsernameCard from '@/components/UsernameCard';
+import RizzFeedbackSection from '@/components/RizzFeedbackSection';
+import RizzLinkBuilder from '@/components/RizzLinkBuilder';
+
+// Recharts (dynamic import to avoid SSR issues)
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
+const AreaChart = dynamic(() => import('recharts').then(m => m.AreaChart), { ssr: false });
+const Area = dynamic(() => import('recharts').then(m => m.Area), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false });
+const RechartsTooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false });
+const RadarChart = dynamic(() => import('recharts').then(m => m.RadarChart), { ssr: false });
+const PolarGrid = dynamic(() => import('recharts').then(m => m.PolarGrid), { ssr: false });
+const PolarAngleAxis = dynamic(() => import('recharts').then(m => m.PolarAngleAxis), { ssr: false });
+const Radar = dynamic(() => import('recharts').then(m => m.Radar), { ssr: false });
 
 // ─── Types (unchanged from API) ───────────────────────────────────────────────
 interface SkillInfo {
@@ -20,6 +36,8 @@ interface SkillProfile {
 }
 interface DashData {
   isPremium: boolean;
+  username: string | null;
+  usernameSetAt: string | null;
   stats: {
     totalAnalyses: number; practiceCount: number | null;
     averageScore: number; totalPoints: number; skillInfo: SkillInfo;
@@ -527,6 +545,29 @@ export default function DashboardPage() {
             </div>
           </Reveal>
 
+          {/* ── Username / Rizz Link Card ──────────────────────────── */}
+          <Reveal delay={0.15}>
+            <div style={{ marginBottom: 10 }}>
+              <UsernameCard
+                currentUsername={data?.username || null}
+                usernameSetAt={data?.usernameSetAt || null}
+                isPremium={data?.isPremium || false}
+              />
+            </div>
+          </Reveal>
+
+          {/* ── Rizz Link Builder ───────────────────────────────── */}
+          <Reveal delay={0.16}>
+            <div style={{ marginBottom: 10 }}>
+              <RizzLinkBuilder username={data?.username || null} />
+            </div>
+          </Reveal>
+
+          {/* ── Rizz Feedback Section ──────────────────────────────── */}
+          <Reveal delay={0.17}>
+            <RizzFeedbackSection />
+          </Reveal>
+
           {/* ── MID GRID: Focus + Momentum ──────────────────────────── */}
           <Reveal delay={0.16}>
             <div className="mid-grid" style={{ marginBottom: 10 }}>
@@ -692,6 +733,44 @@ export default function DashboardPage() {
               <StreakCalendar analyses={data?.recentAnalyses ?? []} />
             </div>
           </Reveal>
+
+          {/* ── RECHARTS: SCORE TREND ──────────────────────────────── */}
+          {scores.length >= 2 && (
+            <Reveal delay={0.24}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 22, padding: '20px 22px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 4 }}>Score Trend · All Analyses</div>
+                    <div style={{ fontSize: 12, color: C.muted2 }}>Your conversation scores over time</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.violet }} />
+                    <span style={{ fontSize: 10, color: C.muted }}>Score</span>
+                  </div>
+                </div>
+                <div style={{ width: '100%', height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data?.scoreHistory ?? []} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+                      <defs>
+                        <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={C.violet} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={C.violet} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgba(240,237,232,0.25)' }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: 'rgba(240,237,232,0.25)' }} axisLine={false} tickLine={false} />
+                      <RechartsTooltip
+                        contentStyle={{ background: '#1A1A28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12, color: '#F0EDE8' }}
+                        labelStyle={{ color: 'rgba(240,237,232,0.5)', fontSize: 10, marginBottom: 4 }}
+                        formatter={(value: number) => [value.toFixed(1), 'Score']}
+                      />
+                      <Area type="monotone" dataKey="score" stroke={C.violet} strokeWidth={2} fill="url(#scoreGrad)" dot={false} activeDot={{ r: 4, fill: C.violet, stroke: C.bg, strokeWidth: 2 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </Reveal>
+          )}
 
           {/* ── HISTORY TABS ─────────────────────────────────────────── */}
           <Reveal delay={0.26}>
