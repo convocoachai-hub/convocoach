@@ -11,14 +11,22 @@ interface UsernameCardProps {
   onUsernameSet?: (username: string) => void;
 }
 
+// ─── DESIGN TOKENS — Neo-Brutalism ───────────────────────────────────────────
 const C = {
-  bg: '#08080F', surface: 'rgba(255,255,255,0.03)', surfaceHi: 'rgba(255,255,255,0.055)',
-  border: 'rgba(255,255,255,0.07)', borderHi: 'rgba(255,255,255,0.14)',
-  text: '#F0EDE8', muted: 'rgba(240,237,232,0.3)', muted2: 'rgba(240,237,232,0.55)',
-  coral: '#FF5B3A', coralLo: 'rgba(255,91,58,0.1)',
-  violet: '#7B6CF6', violetLo: 'rgba(123,108,246,0.1)',
-  green: '#4DEBA1', greenLo: 'rgba(77,235,161,0.08)',
-  gold: '#F5C842',
+  cream:     '#F3EDE2',
+  ink:       '#0F0C09',
+  red:       '#D13920',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  warm1:     '#E8E0D2',
+  warm2:     '#D4CBBA',
+  muted:     '#8A8074',
+  shadow:    '4px 4px 0px #0F0C09',
+  shadowSm:  '2px 2px 0px #0F0C09',
+  border:    '3px solid #0F0C09',
+  borderThin:'2px solid #0F0C09',
 };
 
 export default function UsernameCard({ currentUsername, usernameSetAt, isPremium, onUsernameSet }: UsernameCardProps) {
@@ -58,7 +66,7 @@ export default function UsernameCard({ currentUsername, usernameSetAt, isPremium
       const data = await res.json();
       if (data.success) {
         setStatus('done');
-        setMessage(`Your Rizz Link: convocoach.ai/u/${data.username}`);
+        setMessage(`Your Rizz Link: convocoach.xyz/u/${data.username}`);
         setIsEditing(false);
         onUsernameSet?.(data.username);
       } else {
@@ -73,20 +81,22 @@ export default function UsernameCard({ currentUsername, usernameSetAt, isPremium
 
   return (
     <div style={{
-      background: currentUsername ? C.surface : `linear-gradient(135deg, ${C.coralLo}, ${C.violetLo})`,
-      border: `1px solid ${currentUsername ? C.border : C.borderHi}`,
-      borderRadius: 18, padding: '20px 22px',
+      background: currentUsername ? C.white : C.yellow,
+      border: C.border, borderRadius: 20, padding: '24px',
+      boxShadow: C.shadow,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, fontFamily: "'DM Sans',sans-serif" }}>
-            {currentUsername ? '🔗 Your Rizz Link' : '🔗 Claim Your Rizz Link'}
+          <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: currentUsername ? C.blue : C.red, border: '1px solid #000' }} />
+            {currentUsername ? 'Your Rizz Link' : 'Claim Your Rizz Link'}
           </div>
         </div>
         {currentUsername && canChange && !isEditing && (
           <button onClick={() => setIsEditing(true)} style={{
-            background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 8,
-            padding: '4px 12px', fontSize: 10, fontWeight: 700, color: C.muted2, cursor: 'pointer',
+            background: C.warm1, border: C.borderThin, borderRadius: 10,
+            padding: '6px 14px', fontSize: 11, fontWeight: 900, color: C.ink, 
+            cursor: 'pointer', textTransform: 'uppercase', boxShadow: C.shadowSm,
           }}>
             {isPremium ? 'Change' : ''}
           </button>
@@ -97,34 +107,35 @@ export default function UsernameCard({ currentUsername, usernameSetAt, isPremium
         {currentUsername && !isEditing ? (
           <motion.div key="display" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Link href={`/u/${currentUsername}`} style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 12,
-                padding: '12px 16px', cursor: 'pointer',
+              <motion.div whileHover={{ x: 4, boxShadow: C.shadowSm }} transition={{ duration: 0.2 }}
+                style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: C.bgCream, border: C.borderThin, borderRadius: 14,
+                padding: '14px 20px', cursor: 'pointer', boxShadow: '2px 2px 0px #0F0C09',
               }}>
-                <span style={{ fontSize: 16, fontWeight: 800, color: C.coral, fontFamily: "'Bricolage Grotesque',sans-serif" }}>
+                <span style={{ fontSize: 18, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", letterSpacing: '-0.02em' }}>
                   @{currentUsername}
                 </span>
-                <span style={{ fontSize: 11, color: C.muted, marginLeft: 'auto', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto', fontWeight: 700, fontFamily: "'DM Sans',sans-serif" }}>
                   /u/{currentUsername} →
                 </span>
-              </div>
+              </motion.div>
             </Link>
           </motion.div>
         ) : (
           <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {!canChange ? (
-              <div style={{ fontSize: 12, color: C.muted2, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: C.ink, lineHeight: 1.5, fontWeight: 600, background: C.warm1, padding: 16, borderRadius: 12, border: C.borderThin }}>
                 Free users can only set their username once.{' '}
-                <Link href="/upgrade" style={{ color: C.coral, textDecoration: 'none', fontWeight: 700 }}>Upgrade to change it</Link>
+                <Link href="/upgrade" style={{ color: C.red, textDecoration: 'none', fontWeight: 900 }}>Upgrade to change it</Link>
               </div>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', flex: '1 1 200px' }}>
                     <span style={{
-                      position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                      fontSize: 14, color: C.muted, fontWeight: 600, pointerEvents: 'none',
+                      position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 16, color: C.ink, fontWeight: 900, pointerEvents: 'none',
                     }}>@</span>
                     <input
                       value={input}
@@ -141,46 +152,49 @@ export default function UsernameCard({ currentUsername, usernameSetAt, isPremium
                       }}
                       placeholder="your_username"
                       style={{
-                        width: '100%', background: C.surfaceHi, border: `1px solid ${available === true ? C.green + '40' : available === false ? C.coral + '40' : C.border}`,
-                        borderRadius: 12, padding: '12px 14px 12px 30px', fontSize: 14, fontWeight: 600,
-                        color: C.text, outline: 'none', fontFamily: "'DM Sans', sans-serif",
-                        transition: 'border-color 0.2s',
+                        width: '100%', background: C.white, 
+                        border: `3px solid ${available === true ? C.green : available === false ? C.red : C.ink}`,
+                        borderRadius: 14, padding: '14px 16px 14px 36px', fontSize: 16, fontWeight: 800,
+                        color: C.ink, outline: 'none', fontFamily: "'DM Sans', sans-serif",
+                        transition: 'border-color 0.2s', boxShadow: C.shadowSm,
                       }}
                     />
                     {status === 'checking' && (
-                      <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: C.muted }}>...</span>
+                      <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 800, color: C.muted }}>...</span>
                     )}
                     {available === true && input.length >= 3 && (
-                      <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: C.green }}>✓</span>
+                      <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: C.green, fontWeight: 900 }}>✓</span>
                     )}
                     {available === false && (
-                      <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: C.coral }}>✗</span>
+                      <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: C.red, fontWeight: 900 }}>✗</span>
                     )}
                   </div>
                   <motion.button
-                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                    whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
                     onClick={handleSave}
                     disabled={status === 'saving' || available === false || input.length < 3}
                     style={{
-                      background: C.coral, color: '#fff', border: 'none', borderRadius: 12,
-                      padding: '12px 20px', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                      fontFamily: "'Bricolage Grotesque',sans-serif",
+                      background: C.ink, color: C.white, border: C.borderThin, borderRadius: 14,
+                      padding: '14px 24px', fontSize: 14, fontWeight: 900, cursor: 'pointer',
+                      fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
                       opacity: (status === 'saving' || available === false || input.length < 3) ? 0.5 : 1,
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'nowrap', boxShadow: C.shadowSm,
                     }}
                   >
-                    {status === 'saving' ? '...' : currentUsername ? 'Update' : 'Claim'}
+                    {status === 'saving' ? 'Saving...' : currentUsername ? 'Update' : 'Claim Link'}
                   </motion.button>
                 </div>
+                
                 {message && (
                   <div style={{
-                    fontSize: 11, color: status === 'done' ? C.green : status === 'error' ? C.coral : C.muted2,
-                    marginTop: 8, fontFamily: 'monospace',
+                    fontSize: 12, color: status === 'done' ? C.green : status === 'error' ? C.red : C.ink,
+                    marginTop: 12, fontWeight: 800, padding: '8px 12px', background: C.white, border: C.borderThin, borderRadius: 8, display: 'inline-block'
                   }}>
                     {message}
                   </div>
                 )}
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>
+                
+                <div style={{ fontSize: 11, color: '#555', marginTop: 12, fontWeight: 600 }}>
                   3–20 characters • Letters, numbers, underscores only
                 </div>
               </>

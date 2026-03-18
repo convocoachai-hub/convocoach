@@ -8,18 +8,16 @@ import dynamic from 'next/dynamic';
 import UsernameCard from '@/components/UsernameCard';
 import RizzFeedbackSection from '@/components/RizzFeedbackSection';
 import RizzLinkBuilder from '@/components/RizzLinkBuilder';
+import { ArrowRight, Lock as LockIcon, Check, Zap, TrendingUp, AlertTriangle } from 'lucide-react';
 
 // Recharts (dynamic import to avoid SSR issues)
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
-const AreaChart = dynamic(() => import('recharts').then(m => m.AreaChart), { ssr: false });
-const Area = dynamic(() => import('recharts').then(m => m.Area), { ssr: false });
+const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false });
+const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false });
 const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false });
 const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false });
 const RechartsTooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false });
-const RadarChart = dynamic(() => import('recharts').then(m => m.RadarChart), { ssr: false });
-const PolarGrid = dynamic(() => import('recharts').then(m => m.PolarGrid), { ssr: false });
-const PolarAngleAxis = dynamic(() => import('recharts').then(m => m.PolarAngleAxis), { ssr: false });
-const Radar = dynamic(() => import('recharts').then(m => m.Radar), { ssr: false });
 
 // ─── Types (unchanged from API) ───────────────────────────────────────────────
 interface SkillInfo {
@@ -60,36 +58,26 @@ interface DashData {
   scoreHistory: Array<{ index: number; score: number; date: string }>;
 }
 
-// ─── Design System ────────────────────────────────────────────────────────────
+// ─── Design System — Neo-Brutalism ────────────────────────────────────────────
 const C = {
-  bg: '#08080F',
-  paper: '#0D0D18',
-  surface: 'rgba(255,255,255,0.03)',
-  surfaceHi: 'rgba(255,255,255,0.055)',
-  border: 'rgba(255,255,255,0.07)',
-  borderHi: 'rgba(255,255,255,0.14)',
-  text: '#F0EDE8',
-  muted: 'rgba(240,237,232,0.3)',
-  muted2: 'rgba(240,237,232,0.55)',
-  // Signature accents
-  coral: '#FF5B3A',
-  coralLo: 'rgba(255,91,58,0.1)',
-  coralHi: 'rgba(255,91,58,0.22)',
-  violet: '#7B6CF6',
-  violetLo: 'rgba(123,108,246,0.1)',
-  violetHi: 'rgba(123,108,246,0.22)',
-  violetBr: '#B8AFFF',
-  green: '#4DEBA1',
-  greenLo: 'rgba(77,235,161,0.08)',
-  gold: '#F5C842',
-  goldLo: 'rgba(245,200,66,0.08)',
-  goldHi: 'rgba(245,200,66,0.2)',
-  red: '#FF6B6B',
-  redLo: 'rgba(255,107,107,0.08)',
-  cyan: '#42D4F5',
+  cream:     '#F3EDE2',
+  ink:       '#0F0C09',
+  red:       '#D13920',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  warm1:     '#E8E0D2',
+  warm2:     '#D4CBBA',
+  muted:     '#8A8074',
+  shadow:    '4px 4px 0px #0F0C09',
+  shadowLg:  '8px 8px 0px #0F0C09',
+  border:    '3px solid #0F0C09',
+  borderThin:'2px solid #0F0C09',
 };
 
-const EO = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const;
+const EO = { duration: 0.4, ease: [0.2, 0, 0.2, 1] } as const;
+const SNAP = { duration: 0.18, ease: [0.2, 0, 0.2, 1] } as const;
 const SP = { type: 'spring', stiffness: 200, damping: 24 } as const;
 
 const CHAR_LABELS: Record<string, string> = {
@@ -106,126 +94,103 @@ const CHAR_LABELS: Record<string, string> = {
 };
 
 const LEVEL_META: Record<string, { color: string; glyph: string; desc: string }> = {
-  'Dry Texter':              { color: C.muted2,   glyph: '💤', desc: 'Just getting started' },
-  'Average Talker':          { color: C.violetBr, glyph: '💬', desc: 'Making progress' },
-  'Smooth Conversationalist':{ color: C.gold,     glyph: '✨', desc: 'Above average' },
-  'Elite Charmer':           { color: C.green,    glyph: '👑', desc: 'Top tier' },
+  'Dry Texter':              { color: C.muted,   glyph: '💤', desc: 'Just getting started' },
+  'Average Talker':          { color: C.blue,    glyph: '💬', desc: 'Making progress' },
+  'Smooth Conversationalist':{ color: C.pink,    glyph: '✨', desc: 'Above average' },
+  'Elite Charmer':           { color: C.red,     glyph: '👑', desc: 'Top tier' },
 };
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
-function Reveal({ children, delay = 0, y = 18 }: { children: React.ReactNode; delay?: number; y?: number }) {
+
+function Reveal({ children, delay = 0, y = 20 }: { children: React.ReactNode; delay?: number; y?: number }) {
   return (
     <motion.div initial={{ opacity: 0, y }} animate={{ opacity: 1, y: 0 }} transition={{ ...EO, delay }}>
       {children}
     </motion.div>
   );
 }
-
-function Bar({ pct, color, delay = 0, h = 3 }: { pct: number; color: string; delay?: number; h?: number }) {
+function Label({ text, color = C.yellow }: { text: string; color?: string }) {
   return (
-    <div style={{ height: h, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
-      <motion.div style={{ height: '100%', background: color, borderRadius: 99 }}
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ width: 12, height: 12, background: color, border: C.border, borderRadius: 2, flexShrink: 0 }} />
+      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase', fontFamily: "'DM Sans', sans-serif", color: C.black }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+function Bar({ pct, color, delay = 0, h = 6 }: { pct: number; color: string; delay?: number; h?: number }) {
+  return (
+    <div style={{ height: h, background: C.warm1, border: '1px solid #0F0C09', borderRadius: 99, overflow: 'hidden' }}>
+      <motion.div style={{ height: '100%', background: color, borderRight: '1px solid #0F0C09' }}
         initial={{ width: 0 }} animate={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-        transition={{ duration: 1.3, delay, ease: [0.16, 1, 0.3, 1] }} />
+        transition={{ duration: 1.0, delay, ease: [0.16, 1, 0.3, 1] }} />
     </div>
   );
 }
 
-function Ring({ val, max, color, label, size = 72, sub }: {
+function Ring({ val, max, color, label, size = 80, sub }: {
   val: number; max: number; color: string; label: string; size?: number; sub?: string;
 }) {
-  const r = size / 2 - 6, circ = 2 * Math.PI * r;
+  const r = size / 2 - 8, circ = 2 * Math.PI * r;
   const displayVal = max === 10 ? val.toFixed(1) : Math.round(val);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-      <div style={{ position: 'relative', width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={4} />
-          <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={4}
+      <div style={{ position: 'relative', width: size, height: size, background: C.white, borderRadius: '50%', border: C.borderThin, boxShadow: C.shadowSm }}>
+        <svg width={size} height={size} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.warm1} strokeWidth={6} />
+          <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={6}
             strokeLinecap="round" initial={{ strokeDasharray: `0 ${circ}` }}
             animate={{ strokeDasharray: `${(val / max) * circ} ${circ}` }}
             transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.25 }} />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: size > 70 ? 15 : 12, fontWeight: 800, color, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1 }}>{displayVal}</span>
-          {sub && <span style={{ fontSize: 8, color: C.muted, marginTop: 2 }}>{sub}</span>}
+          <span style={{ fontSize: size > 70 ? 20 : 16, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", lineHeight: 1 }}>{displayVal}</span>
+          {sub && <span style={{ fontSize: 9, color: C.muted, marginTop: 2, fontWeight: 800 }}>{sub}</span>}
         </div>
       </div>
-      <span style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center', fontFamily: "'DM Sans',sans-serif" }}>{label}</span>
+      <span style={{ fontSize: 10, color: C.ink, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'center', fontFamily: "'DM Sans',sans-serif" }}>{label}</span>
     </div>
   );
 }
 
 function MTag({ val }: { val: string }) {
-  const m: Record<string, { label: string; color: string; bg: string }> = {
-    escalating: { label: '↑ Rising', color: C.green, bg: C.greenLo },
-    neutral:    { label: '→ Flat',   color: C.gold,  bg: C.goldLo },
-    dying:      { label: '↓ Fading', color: C.red,   bg: C.redLo },
+  const m: Record<string, { label: string; bg: string; color: string }> = {
+    escalating: { label: '↑ RISING', bg: C.green,  color: C.ink },
+    neutral:    { label: '→ FLAT',   bg: C.yellow, color: C.ink },
+    dying:      { label: '↓ FADING', bg: C.red,    color: C.white },
   };
   const s = m[val] ?? m.neutral;
   return (
-    <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 5, background: s.bg, color: s.color, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 9, fontWeight: 900, padding: '4px 8px', borderRadius: 6, background: s.bg, color: s.color, border: '1px solid #000', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap' }}>
       {s.label}
     </span>
   );
 }
 
-// ─── Sparkline ────────────────────────────────────────────────────────────────
+// ─── Sparkline (Brutalist) ────────────────────────────────────────────────────
 function Sparkline({ data, color, height = 52 }: { data: number[]; color: string; height?: number }) {
   if (data.length < 2) return (
-    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ fontSize: 11, color: C.muted }}>Analyze more chats to see trend</span>
+    <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.warm1, border: C.borderThin, borderRadius: 8 }}>
+      <span style={{ fontSize: 10, color: C.muted, fontWeight: 800, textTransform: 'uppercase' }}>Need more data</span>
     </div>
   );
   const W = 280, H = height;
   const mn = Math.min(...data) - 0.5, mx = Math.max(...data) + 0.5, rng = mx - mn || 1;
   const pts = data.map((v, i) => `${(i / (data.length - 1)) * W},${H - ((v - mn) / rng) * H}`);
   const path = `M ${pts.join(' L ')}`;
-  const area = `M 0,${H} L ${pts.join(' L ')} L ${W},${H} Z`;
   const lx = W, ly = H - ((data[data.length - 1] - mn) / rng) * H;
+  
   return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#sg-${color.replace('#','')})`} />
-      <motion.path d={path} fill="none" stroke={color} strokeWidth={1.8}
-        strokeLinecap="round" strokeLinejoin="round"
-        initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1], delay: 0.4 }} />
-      <motion.circle cx={lx} cy={ly} r={3.5} fill={color}
-        initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.8, ...SP }} />
-    </svg>
-  );
-}
-
-// ─── Streak mini calendar ─────────────────────────────────────────────────────
-function StreakCalendar({ analyses }: { analyses: Array<{ createdAt: string }> }) {
-  const days = 28;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const activitySet = new Set(analyses.map(a => new Date(a.createdAt).toDateString()));
-  const cells = Array.from({ length: days }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (days - 1 - i));
-    return { date: d, active: activitySet.has(d.toDateString()), isToday: i === days - 1 };
-  });
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-      {cells.map((c, i) => (
-        <motion.div key={i} initial={{ scale: 0 }} animate={{ scale: 1 }}
-          transition={{ delay: 0.02 * i, ...SP }}
-          title={c.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          style={{
-            aspectRatio: '1', borderRadius: 4,
-            background: c.active ? C.violet : c.isToday ? 'rgba(123,108,246,0.15)' : 'rgba(255,255,255,0.04)',
-            border: c.isToday ? `1px solid ${C.violetHi}` : '1px solid transparent',
-            cursor: 'default',
-          }} />
-      ))}
+    <div style={{ background: C.white, border: C.borderThin, borderRadius: 12, padding: '8px 0', height: H + 16, overflow: 'hidden' }}>
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+        <motion.path d={path} fill="none" stroke={color} strokeWidth={3}
+          strokeLinecap="square" strokeLinejoin="miter"
+          initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1], delay: 0.4 }} />
+        <motion.circle cx={lx} cy={ly} r={5} fill={C.ink}
+          initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.8, ...SP }} />
+      </svg>
     </div>
   );
 }
@@ -233,28 +198,24 @@ function StreakCalendar({ analyses }: { analyses: Array<{ createdAt: string }> }
 // ─── Premium Lock overlay ─────────────────────────────────────────────────────
 function Lock({ title, desc, compact = false }: { title: string; desc: string; compact?: boolean }) {
   return (
-    <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: C.surface, border: `1px solid ${C.border}` }}>
-      {/* blurred mock content */}
-      <div style={{ filter: 'blur(7px)', opacity: 0.25, pointerEvents: 'none', padding: compact ? '16px 18px' : '24px', userSelect: 'none' }}>
-        <div style={{ height: 10, background: C.border, borderRadius: 4, marginBottom: 10, width: '60%' }} />
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          {[55, 75, 40, 65, 80].map((h, i) => (
-            <div key={i} style={{ flex: 1, height: h, background: C.violetBr, borderRadius: 3, opacity: 0.5 }} />
-          ))}
-        </div>
-        <div style={{ height: 8, background: C.border, borderRadius: 4, width: '80%' }} />
+    <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: C.white, border: C.borderThin }}>
+      {/* striped mock content */}
+      <div style={{ opacity: 0.1, pointerEvents: 'none', padding: compact ? '16px 18px' : '24px', userSelect: 'none', background: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 12px)' }}>
+        <div style={{ height: 100 }} />
       </div>
       {/* lock overlay */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(8,8,15,0.65)', backdropFilter: 'blur(2px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 20 }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: C.goldLo, border: `1px solid ${C.goldHi}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🔒</div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: C.text, marginBottom: 4, fontFamily: "'Bricolage Grotesque',sans-serif" }}>{title}</div>
-          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, maxWidth: 220 }}>{desc}</div>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(243,237,226,0.85)', backdropFilter: 'blur(3px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: C.yellow, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: C.shadowSm }}>
+          <LockIcon style={{ width: 20, height: 20, color: C.ink }} />
         </div>
-        <Link href="/upgrade">
-          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-            style={{ background: C.gold, color: '#1A0E00', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif" }}>
-            Upgrade — ₹99/mo
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: C.ink, marginBottom: 4, fontFamily: "'DM Sans',sans-serif", textTransform: 'uppercase' }}>{title}</div>
+          <div style={{ fontSize: 13, color: '#555', lineHeight: 1.55, maxWidth: 260, fontWeight: 500 }}>{desc}</div>
+        </div>
+        <Link href="/upgrade" style={{ textDecoration: 'none' }}>
+          <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+            style={{ background: C.ink, color: C.white, border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", marginTop: 4 }}>
+            Upgrade to Unlock
           </motion.button>
         </Link>
       </div>
@@ -265,33 +226,35 @@ function Lock({ title, desc, compact = false }: { title: string; desc: string; c
 // ─── What to Work On card ─────────────────────────────────────────────────────
 function WorkOnCard({ data }: { data: DashData }) {
   const { stats, skillProfile, isPremium } = data;
-  const items: { icon: string; text: string; color: string }[] = [];
+  const items: { icon: any; text: string; color: string }[] = [];
 
-  if (stats.scoreTrend === 'down') items.push({ icon: '↓', text: 'Your scores are dropping — analyze a recent chat to find the pattern', color: C.red });
-  if (stats.streak === 0) items.push({ icon: '🔥', text: 'No activity today — stay consistent for faster improvement', color: C.coral });
-  if (stats.momentumBreakdown.dying > stats.momentumBreakdown.escalating) items.push({ icon: '⚠', text: 'Most of your chats are fading — focus on conversation momentum', color: C.gold });
+  if (stats.scoreTrend === 'down') items.push({ icon: <TrendingUp style={{width:16, height:16, transform:'rotate(180deg)'}}/>, text: 'Scores are dropping. Review your last chat.', color: C.red });
+  if (stats.streak === 0) items.push({ icon: <Zap style={{width:16, height:16}}/>, text: 'No activity today. Analyze one chat to build momentum.', color: C.yellow });
+  if (stats.momentumBreakdown.dying > stats.momentumBreakdown.escalating) items.push({ icon: <AlertTriangle style={{width:16, height:16}}/>, text: 'Conversations are fading. Work on asking open questions.', color: C.blue });
 
   if (isPremium && skillProfile?.weaknesses.length) {
     const w = skillProfile.weaknesses[0];
-    items.push({ icon: '📌', text: `Your biggest issue: ${w.label} (${w.count}× detected). Work on this in practice mode`, color: C.violet });
+    items.push({ icon: <LockIcon style={{width:16, height:16}}/>, text: `Primary weakness: ${w.label} (${w.count}× detected).`, color: C.pink });
   }
 
-  if (stats.averageScore >= 7) items.push({ icon: '🎯', text: 'You\'re performing well — try harder practice characters to level up', color: C.green });
-  else if (stats.averageScore < 5) items.push({ icon: '💡', text: 'Average score below 5 — focus on asking more questions and matching their energy', color: C.violetBr });
+  if (stats.averageScore >= 7) items.push({ icon: <Check style={{width:16, height:16}}/>, text: 'Performing well. Try Hard mode in Practice.', color: C.green });
+  else if (stats.averageScore < 5) items.push({ icon: <AlertTriangle style={{width:16, height:16}}/>, text: 'Avg score < 5. Focus on matching text length.', color: C.red });
 
-  if (!items.length) items.push({ icon: '✓', text: 'Looking good — keep analyzing conversations to track improvement', color: C.green });
+  if (!items.length) items.push({ icon: <Check style={{width:16, height:16}}/>, text: 'Looking solid. Keep analyzing new conversations.', color: C.green });
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 20px', height: '100%' }}>
-      <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 14, fontFamily: "'DM Sans',sans-serif" }}>Focus This Week</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', height: '100%', boxShadow: C.shadow }}>
+      <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, marginBottom: 16, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ width: 8, height: 8, background: C.red, borderRadius: '50%', border: '1px solid #000' }}/> Focus This Week
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {items.slice(0, 3).map((item, i) => (
-          <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08, ...SP }}
-            style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: item.color + '18', border: `1px solid ${item.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0, marginTop: 1 }}>
+          <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08, ...EO }}
+            style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: C.warm1, padding: '12px', borderRadius: 12, border: C.borderThin }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: C.white, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
               {item.icon}
             </div>
-            <p style={{ fontSize: 12, color: C.muted2, lineHeight: 1.55, margin: 0 }}>{item.text}</p>
+            <p style={{ fontSize: 13, color: C.ink, lineHeight: 1.5, margin: 0, fontWeight: 600, paddingTop: 2 }}>{item.text}</p>
           </motion.div>
         ))}
       </div>
@@ -302,15 +265,15 @@ function WorkOnCard({ data }: { data: DashData }) {
 // ─── Unauthenticated ──────────────────────────────────────────────────────────
 function Unauth() {
   return (
-    <div style={{ minHeight: '100svh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ textAlign: 'center', maxWidth: 380 }}>
-        <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
-        <h1 style={{ fontSize: 'clamp(34px,6vw,52px)', fontWeight: 800, color: C.text, fontFamily: "'Bricolage Grotesque',sans-serif", letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 14 }}>
-          Track your<br /><em style={{ color: C.violet, fontStyle: 'italic' }}>growth.</em>
+    <div style={{ minHeight: '100svh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ textAlign: 'center', maxWidth: 420, background: C.white, padding: 40, borderRadius: 24, border: C.border, boxShadow: C.shadowLg }}>
+        <div style={{ width: 64, height: 64, background: C.yellow, borderRadius: 16, border: C.border, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: 32, boxShadow: C.shadowSm }}>📊</div>
+        <h1 style={{ fontSize: 'clamp(32px,6vw,46px)', fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 16 }}>
+          Track your<br />progress.
         </h1>
-        <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.7, marginBottom: 32 }}>Sign in to see your score history, skill level, and how your conversation game evolves.</p>
-        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => signIn('google')}
-          style={{ background: C.text, color: C.bg, border: 'none', borderRadius: 13, padding: '14px 28px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif" }}>
+        <p style={{ fontSize: 15, color: '#555', lineHeight: 1.6, marginBottom: 32, fontWeight: 500 }}>Sign in to see your score history, skill level, and how your conversation game evolves over time.</p>
+        <motion.button whileHover={{ y: -3, boxShadow: C.shadow }} whileTap={{ y: 1, boxShadow: 'none' }} onClick={() => signIn('google')}
+          style={{ width: '100%', background: C.ink, color: C.white, border: C.border, borderRadius: 14, padding: '16px', fontSize: 15, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
           Continue with Google →
         </motion.button>
       </div>
@@ -327,8 +290,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [histTab, setHistTab] = useState<'analyses' | 'practice'>('analyses');
-  const [resetConfirm, setResetConfirm] = useState(false);
-
+const [resetConfirm, setResetConfirm] = useState(false);
   useEffect(() => {
     if (status === 'loading') return;
     if (status === 'unauthenticated') { setLoading(false); return; }
@@ -342,16 +304,18 @@ export default function DashboardPage() {
   if (status === 'unauthenticated') return <Unauth />;
 
   if (status === 'loading' || loading) return (
-    <div style={{ minHeight: '100svh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <motion.div style={{ width: 26, height: 26, borderRadius: '50%', border: `2px solid ${C.violet}`, borderTopColor: 'transparent' }}
+    <div style={{ minHeight: '100svh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <motion.div style={{ width: 40, height: 40, borderRadius: '50%', border: `4px solid ${C.ink}`, borderTopColor: 'transparent' }}
         animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }} />
     </div>
   );
 
   if (error) return (
-    <div style={{ minHeight: '100svh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-      <p style={{ color: C.red, fontSize: 13 }}>{error}</p>
-      <button onClick={() => window.location.reload()} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 10, padding: '10px 20px', cursor: 'pointer', fontSize: 13 }}>Retry</button>
+    <div style={{ minHeight: '100svh', background: C.cream, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: '#FFF0F0', border: C.border, padding: 24, borderRadius: 16, textAlign: 'center', boxShadow: C.shadow }}>
+        <p style={{ color: C.red, fontSize: 16, fontWeight: 800, margin: '0 0 16px' }}>{error}</p>
+        <button onClick={() => window.location.reload()} style={{ background: C.ink, border: 'none', color: C.white, borderRadius: 10, padding: '10px 24px', cursor: 'pointer', fontSize: 14, fontWeight: 800 }}>Retry</button>
+      </div>
     </div>
   );
 
@@ -362,27 +326,27 @@ export default function DashboardPage() {
   const isPremium = data?.isPremium ?? false;
   const freeLeft = Math.max(0, 3 - (s?.freeTriesUsed ?? 0));
   const name = session?.user?.name?.split(' ')[0] ?? 'You';
-  const scColor = (sc: number) => sc >= 7 ? C.green : sc >= 5 ? C.gold : C.red;
+  const scColor = (sc: number) => sc >= 7 ? C.green : sc >= 5 ? C.yellow : C.red;
+  
+  // Brutalist Arrow symbols
   const trendArrow = { up: '↑', down: '↓', flat: '→' }[s?.scoreTrend ?? 'flat'];
-  const trendColor = { up: C.green, down: C.red, flat: C.muted2 }[s?.scoreTrend ?? 'flat'];
+  const trendColor = { up: C.green, down: C.red, flat: C.muted }[s?.scoreTrend ?? 'flat'];
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist+Mono:wght@400;500;700&display=swap');
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html{scroll-behavior:smooth;}
-        ::selection{background:rgba(123,108,246,0.3);}
-        ::-webkit-scrollbar{width:2px;}
-        ::-webkit-scrollbar-thumb{background:rgba(123,108,246,0.3);border-radius:2px;}
-        .mono{font-family:'Geist Mono',monospace;}
-        button{-webkit-tap-highlight-color:transparent;}
+        html{scroll-behavior:smooth; overflow-x: hidden;}
+        body{background: ${C.cream}; overflow-x: hidden; width: 100%;}
+        ::selection{background:${C.yellow}; color: ${C.ink};}
+        ::-webkit-scrollbar{width:4px;}
+        ::-webkit-scrollbar-thumb{background:${C.ink};border-radius:0px;}
 
-        .main-grid{display:grid;grid-template-columns:1fr;gap:10px;}
-        .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
-        .mid-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+        .mid-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
         .profile-inner{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;}
-        .rings{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+        .rings{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;}
 
         @media(max-width:860px){
           .stat-row{grid-template-columns:1fr 1fr;}
@@ -390,42 +354,39 @@ export default function DashboardPage() {
           .profile-inner{grid-template-columns:1fr 1fr;}
         }
         @media(max-width:520px){
-          .stat-row{grid-template-columns:1fr 1fr;}
+          .stat-row{grid-template-columns:1fr;}
           .profile-inner{grid-template-columns:1fr;}
-          .rings{gap:10px;}
+          .rings{gap:16px;}
           .hide-xs{display:none!important;}
+          .dash-wrap { padding: 32px 16px !important; }
         }
 
+        .hist-row { transition: all 0.2s; }
         @media(hover:hover){
-          .hist-row:hover{background:rgba(255,255,255,0.025)!important;}
-          .qbtn:hover{opacity:0.72;}
+          .hist-row:hover{background: ${C.warm1}!important; transform: translateX(4px); border-radius: 8px;}
         }
-      `}</style>
+      `}} />
 
-      <div style={{ background: C.bg, color: C.text, fontFamily: "'DM Sans',sans-serif", minHeight: '100svh', overflowX: 'hidden', paddingBottom: 100 }}>
-
-        {/* ── ambient glow ────────────────────────────────────────── */}
-        <div style={{ position: 'fixed', top: -60, left: '50%', transform: 'translateX(-50%)', width: 600, height: 300, background: `radial-gradient(ellipse, ${C.violet}08, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
-
-        <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 clamp(14px,4vw,24px)', position: 'relative', zIndex: 1 }}>
+      <div style={{ background: C.cream, color: C.ink, fontFamily: "'DM Sans',sans-serif", minHeight: '100svh', paddingBottom: 100 }}>
+        <div className="dash-wrap" style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px', position: 'relative' }}>
 
           {/* ── FREE TRIAL BANNER ────────────────────────────────────── */}
           {!isPremium && s && (
             <Reveal>
               <Link href="/upgrade" style={{ textDecoration: 'none' }}>
-                <motion.div whileHover={{ scale: 1.005 }}
-                  style={{ background: `linear-gradient(135deg, ${C.goldLo}, rgba(123,108,246,0.06))`, border: `1px solid ${C.gold}35`, borderRadius: 14, padding: '13px 18px', marginTop: 16, marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ fontSize: 18 }}>⚡</div>
+                <motion.div whileHover={{ y: -3, boxShadow: C.shadow }} whileTap={{ y: 0, boxShadow: 'none' }}
+                  style={{ background: C.yellow, border: C.border, borderRadius: 16, padding: '16px 20px', marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, cursor: 'pointer', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, background: C.white, border: C.borderThin, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: C.shadowSm, flexShrink: 0 }}>⚡</div>
                     <div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: C.gold, fontFamily: "'Bricolage Grotesque',sans-serif" }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
                         {freeLeft > 0 ? `${freeLeft} free ${freeLeft === 1 ? 'analysis' : 'analyses'} left` : 'Free limit reached'}
-                      </span>
-                      <span style={{ fontSize: 12, color: C.muted, marginLeft: 10 }}>Practice, skill profile, unlimited analyses — ₹99/mo</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#444', fontWeight: 600 }}>Unlock unlimited scans, practice mode & rewrites.</div>
                     </div>
                   </div>
-                  <div style={{ background: C.gold, color: '#1A0E00', padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 800, fontFamily: "'Bricolage Grotesque',sans-serif", whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    Upgrade →
+                  <div style={{ background: C.ink, color: C.white, padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 900, fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Upgrade Now →
                   </div>
                 </motion.div>
               </Link>
@@ -434,32 +395,32 @@ export default function DashboardPage() {
 
           {/* ── HEADER ──────────────────────────────────────────────── */}
           <Reveal delay={0.04}>
-            <div style={{ paddingTop: isPremium ? 48 : 20, paddingBottom: 28, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ paddingBottom: 32, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
               <div>
-                <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 700, marginBottom: 8, fontFamily: "'DM Sans',sans-serif" }}>Dashboard</div>
-                <h1 style={{ fontSize: 'clamp(36px,6vw,58px)', fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 0.95, fontFamily: "'Bricolage Grotesque',sans-serif", color: C.text }}>
+                <Label text="Dashboard" color={C.blue} />
+                <h1 style={{ fontSize: 'clamp(42px,7vw,64px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, fontFamily: "'DM Sans',sans-serif", color: C.ink, margin: 0 }}>
                   {name}'s<br />
-                  <em style={{ color: C.violet, fontStyle: 'italic' }}>progress.</em>
+                  Data.
                 </h1>
                 {isPremium && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, background: C.goldLo, border: `1px solid ${C.gold}35`, borderRadius: 20, padding: '4px 12px' }}>
-                    <span style={{ fontSize: 10 }}>👑</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Premium Active</span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 16, background: C.white, border: C.borderThin, borderRadius: 8, padding: '6px 12px', boxShadow: C.shadowSm }}>
+                    <span style={{ fontSize: 14 }}>👑</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: C.ink, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Premium Active</span>
                   </div>
                 )}
               </div>
               {/* Quick actions */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Link href="/upload">
-                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                    style={{ background: C.text, color: C.bg, border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif", display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-                    Analyze chat →
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <Link href="/upload" style={{ textDecoration: 'none' }}>
+                  <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                    style={{ background: C.red, color: C.white, border: C.borderThin, borderRadius: 12, padding: '14px 24px', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 8 }}>
+                    Analyze Chat →
                   </motion.button>
                 </Link>
-                <Link href="/practice">
-                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                    style={{ background: C.surface, color: C.text, border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    {isPremium ? 'Practice' : '🔒 Practice'}
+                <Link href="/practice" style={{ textDecoration: 'none' }}>
+                  <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                    style={{ background: C.white, color: C.ink, border: C.borderThin, borderRadius: 12, padding: '14px 20px', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                    {isPremium ? 'Practice Mode' : '🔒 Practice'}
                   </motion.button>
                 </Link>
               </div>
@@ -469,49 +430,42 @@ export default function DashboardPage() {
           {/* ── SKILL HERO CARD ──────────────────────────────────────── */}
           {skill && (
             <Reveal delay={0.08}>
-              <div style={{ background: C.paper, border: `1px solid ${C.borderHi}`, borderRadius: 22, padding: 'clamp(18px,3vw,28px)', marginBottom: 10, position: 'relative', overflow: 'hidden' }}>
-                {/* Giant watermark glyph */}
-                <div style={{ position: 'absolute', right: -10, top: -24, fontSize: 160, opacity: 0.04, lineHeight: 1, pointerEvents: 'none', userSelect: 'none', fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 900 }}>
-                  {lm.glyph}
-                </div>
-
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
+              <div style={{ background: C.white, border: C.border, borderRadius: 24, padding: 'clamp(24px,4vw,36px)', marginBottom: 24, boxShadow: C.shadow, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Level + progress */}
-                  <div style={{ flex: '1 1 200px' }}>
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.13em', fontWeight: 700, marginBottom: 10 }}>Skill Level</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: 28, fontWeight: 900, color: lm.color, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1 }}>{skill.level}</span>
-                      <div style={{ fontSize: 11, color: trendColor, fontFamily: "'Geist Mono',monospace", fontWeight: 700 }}>{trendArrow} {s?.scoreTrend}</div>
+                  <div style={{ flex: '1 1 240px' }}>
+                    <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 10, height: 10, background: lm.color, borderRadius: '50%', border: '1px solid #000' }} />
+                      Skill Level
                     </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>{lm.desc} · <span className="mono" style={{ color: C.muted2 }}>{s?.totalPoints.toLocaleString()} pts</span></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <span style={{ fontSize: 'clamp(32px, 4vw, 42px)', fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", lineHeight: 1, letterSpacing: '-0.02em' }}>{skill.level}</span>
+                    </div>
+                    <div style={{ fontSize: 14, color: '#555', marginBottom: 24, fontWeight: 600 }}>{lm.desc} · <span style={{ color: C.ink, fontWeight: 800 }}>{s?.totalPoints.toLocaleString()} pts</span></div>
 
-                    {skill.nextLevel && (
-                      <div style={{ marginBottom: 6 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.muted, marginBottom: 7 }}>
-                          <span>→ {skill.nextLevel}</span>
-                          <span className="mono">{skill.pointsToNext} pts away</span>
+                    {skill.nextLevel ? (
+                      <div style={{ marginBottom: 6, background: C.warm1, padding: 16, borderRadius: 12, border: C.borderThin }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.ink, fontWeight: 800, marginBottom: 10, textTransform: 'uppercase' }}>
+                          <span>Next: {skill.nextLevel}</span>
+                          <span>{skill.pointsToNext} pts away</span>
                         </div>
-                        <Bar pct={skill.progressPct ?? 0} color={lm.color} delay={0.5} h={5} />
+                        <Bar pct={skill.progressPct ?? 0} color={lm.color} delay={0.5} h={8} />
                       </div>
-                    )}
-                    {!skill.nextLevel && (
-                      <div style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>👑 Max level reached</div>
+                    ) : (
+                      <div style={{ fontSize: 14, color: C.white, background: C.ink, padding: '10px 16px', borderRadius: 8, display: 'inline-block', fontWeight: 800 }}>👑 Max level reached</div>
                     )}
                   </div>
 
                   {/* Score sparkline */}
-                  <div style={{ flex: '1 1 160px', minWidth: 0 }} className="hide-xs">
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.13em', fontWeight: 700, marginBottom: 10 }}>Score History</div>
-                    <Sparkline data={scores} color={lm.color} height={56} />
+                  <div style={{ flex: '1 1 200px', minWidth: 0 }} className="hide-xs">
+                    <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 12 }}>Trend</div>
+                    <Sparkline data={scores} color={C.red} height={64} />
                   </div>
 
                   {/* Rings */}
-                  <div className="rings" style={{ alignItems: 'flex-start', paddingTop: 4 }}>
-                    <Ring val={s?.averageScore ?? 0} max={10} color={C.violet} label="Avg Score" size={76} sub="/10" />
-                    <Ring val={s?.avgInterest ?? 0} max={100} color={C.coral} label="Avg Interest" size={76} sub="%" />
-                    {isPremium && s?.practiceCount != null && (
-                      <Ring val={s.practiceCount} max={Math.max(s.practiceCount, 10)} color={C.gold} label="Sessions" size={76} />
-                    )}
+                  <div className="rings" style={{ alignItems: 'center' }}>
+                    <Ring val={s?.averageScore ?? 0} max={10} color={C.blue} label="Avg Score" size={90} sub="/10" />
+                    <Ring val={s?.avgInterest ?? 0} max={100} color={C.yellow} label="Interest" size={90} sub="%" />
                   </div>
                 </div>
               </div>
@@ -520,25 +474,25 @@ export default function DashboardPage() {
 
           {/* ── STAT ROW ─────────────────────────────────────────────── */}
           <Reveal delay={0.12}>
-            <div className="stat-row" style={{ marginBottom: 10 }}>
+            <div className="stat-row" style={{ marginBottom: 24 }}>
               {[
-                { label: 'Chats Analyzed', val: s?.totalAnalyses ?? 0, color: C.violet, icon: '📊', mono: true },
-                { label: 'Day Streak', val: `${s?.streak ?? 0}d`, color: C.coral, icon: '🔥', mono: false, sub: s?.streak ? 'keep it up' : 'start today' },
-                { label: 'Best Score', val: s?.bestScore != null ? `${s.bestScore.toFixed(1)}/10` : '—', color: C.green, icon: '🏆', mono: false },
+                { label: 'Chats Analyzed', val: s?.totalAnalyses ?? 0, color: C.blue, icon: '📊' },
+                { label: 'Day Streak', val: `${s?.streak ?? 0}d`, color: C.red, icon: '🔥', sub: s?.streak ? 'Keep it up' : 'Start today' },
+                { label: 'Best Score', val: s?.bestScore != null ? `${s.bestScore.toFixed(1)}/10` : '—', color: C.green, icon: '🏆' },
                 {
                   label: isPremium ? 'Practice Sessions' : 'Practice 🔒',
                   val: isPremium ? (s?.practiceCount ?? 0) : '—',
-                  color: isPremium ? C.gold : C.muted,
-                  icon: '🎭', mono: true,
+                  color: isPremium ? C.yellow : C.muted,
+                  icon: '🎭',
                   sub: !isPremium ? 'Premium only' : undefined,
                 },
               ].map((tile, i) => (
                 <motion.div key={tile.label} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.06, ...EO }}>
-                  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 18px 14px', height: '100%', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: -4, right: 10, fontSize: 42, opacity: 0.06, lineHeight: 1 }}>{tile.icon}</div>
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 8 }}>{tile.label}</div>
-                    <div className={tile.mono ? 'mono' : ''} style={{ fontSize: 26, fontWeight: 800, color: tile.color, fontFamily: tile.mono ? "'Geist Mono',monospace" : "'Bricolage Grotesque',sans-serif", lineHeight: 1, marginBottom: 4 }}>{String(tile.val)}</div>
-                    {tile.sub && <div style={{ fontSize: 10, color: C.muted }}>{tile.sub}</div>}
+                  <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', height: '100%', position: 'relative', overflow: 'hidden', boxShadow: C.shadow }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: C.warm1, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 16 }}>{tile.icon}</div>
+                    <div style={{ fontSize: 32, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", lineHeight: 1, marginBottom: 8 }}>{String(tile.val)}</div>
+                    <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{tile.label}</div>
+                    {tile.sub && <div style={{ fontSize: 11, color: '#666', marginTop: 6, fontWeight: 600 }}>{tile.sub}</div>}
                   </div>
                 </motion.div>
               ))}
@@ -547,59 +501,59 @@ export default function DashboardPage() {
 
           {/* ── Username / Rizz Link Card ──────────────────────────── */}
           <Reveal delay={0.15}>
-            <div style={{ marginBottom: 10 }}>
-              <UsernameCard
-                currentUsername={data?.username || null}
-                usernameSetAt={data?.usernameSetAt || null}
-                isPremium={data?.isPremium || false}
-              />
+            <div style={{ marginBottom: 24 }}>
+              <UsernameCard currentUsername={data?.username || null} usernameSetAt={data?.usernameSetAt || null} isPremium={data?.isPremium || false} />
             </div>
           </Reveal>
 
           {/* ── Rizz Link Builder ───────────────────────────────── */}
           <Reveal delay={0.16}>
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 24 }}>
               <RizzLinkBuilder username={data?.username || null} />
             </div>
           </Reveal>
 
           {/* ── Rizz Feedback Section ──────────────────────────────── */}
           <Reveal delay={0.17}>
-            <RizzFeedbackSection />
+            <div style={{ marginBottom: 24 }}>
+              <RizzFeedbackSection />
+            </div>
           </Reveal>
 
           {/* ── MID GRID: Focus + Momentum ──────────────────────────── */}
           <Reveal delay={0.16}>
-            <div className="mid-grid" style={{ marginBottom: 10 }}>
+            <div className="mid-grid" style={{ marginBottom: 24 }}>
               {/* Focus this week */}
               {data && <WorkOnCard data={data} />}
 
               {/* Momentum breakdown */}
               {s && s.totalAnalyses > 0 ? (
-                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 20px' }}>
-                  <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 16, fontFamily: "'DM Sans',sans-serif" }}>Chat Momentum</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', boxShadow: C.shadow }}>
+                  <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, marginBottom: 20, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, background: C.blue, borderRadius: '50%', border: '1px solid #000' }}/> Chat Momentum
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                     {[
                       { label: 'Rising', val: s.momentumBreakdown.escalating, color: C.green },
-                      { label: 'Neutral', val: s.momentumBreakdown.neutral, color: C.gold },
+                      { label: 'Neutral', val: s.momentumBreakdown.neutral, color: C.yellow },
                       { label: 'Fading', val: s.momentumBreakdown.dying, color: C.red },
                     ].map((m, i) => {
                       const pct = s.totalAnalyses > 0 ? Math.round((m.val / s.totalAnalyses) * 100) : 0;
                       return (
                         <div key={i}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: m.color }}>{m.label}</span>
-                            <span className="mono" style={{ fontSize: 11, color: C.muted }}>{m.val} · {pct}%</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 900, color: C.ink }}>{m.label}</span>
+                            <span style={{ fontSize: 13, color: '#555', fontWeight: 700 }}>{m.val} ({pct}%)</span>
                           </div>
-                          <Bar pct={pct} color={m.color} delay={0.2 + i * 0.1} h={4} />
+                          <Bar pct={pct} color={m.color} delay={0.2 + i * 0.1} h={8} />
                         </div>
                       );
                     })}
                   </div>
                 </div>
               ) : (
-                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <p style={{ fontSize: 13, color: C.muted, textAlign: 'center' }}>Analyze your first chat to see momentum breakdown</p>
+                <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: C.shadow }}>
+                  <p style={{ fontSize: 14, color: '#555', textAlign: 'center', fontWeight: 600 }}>Analyze your first chat to see momentum breakdown</p>
                 </div>
               )}
             </div>
@@ -608,18 +562,18 @@ export default function DashboardPage() {
           {/* ── SKILL PROFILE (premium gated) ───────────────────────── */}
           <Reveal delay={0.20}>
             {isPremium && data?.skillProfile ? (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 22, overflow: 'hidden', marginBottom: 10 }}>
-                <div style={{ padding: '20px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ background: C.white, border: C.border, borderRadius: 24, overflow: 'hidden', marginBottom: 24, boxShadow: C.shadow }}>
+                <div style={{ padding: '24px', borderBottom: C.borderThin, background: C.bgCream, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 5 }}>Skill Profile · Practice Analysis</div>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, fontFamily: "'Bricolage Grotesque',sans-serif", letterSpacing: '-0.01em' }}>
-                      {data.skillProfile.hasEnoughData ? "What you're actually like" : 'Not enough data yet'}
+                    <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 8 }}>Skill Profile Dossier</div>
+                    <h2 style={{ fontSize: 'clamp(24px,4vw,32px)', fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", letterSpacing: '-0.02em', margin: 0 }}>
+                      {data.skillProfile.hasEnoughData ? "Your Communication Blueprint" : 'Data Gathering Phase'}
                     </h2>
                   </div>
                   {data.skillProfile.avgPracticeScore != null && (
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>Practice avg</div>
-                      <div className="mono" style={{ fontSize: 30, fontWeight: 800, color: data.skillProfile.avgPracticeScore >= 70 ? C.green : data.skillProfile.avgPracticeScore >= 45 ? C.gold : C.red, lineHeight: 1 }}>
+                    <div style={{ textAlign: 'right', background: C.white, padding: '12px 20px', borderRadius: 14, border: C.borderThin, boxShadow: C.shadowSm }}>
+                      <div style={{ fontSize: 10, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4, fontWeight: 800 }}>Practice Avg</div>
+                      <div style={{ fontSize: 36, fontWeight: 900, color: data.skillProfile.avgPracticeScore >= 70 ? C.green : data.skillProfile.avgPracticeScore >= 45 ? C.yellow : C.red, lineHeight: 1 }}>
                         {data.skillProfile.avgPracticeScore}
                       </div>
                     </div>
@@ -627,75 +581,74 @@ export default function DashboardPage() {
                 </div>
 
                 {!data.skillProfile.hasEnoughData ? (
-                  <div style={{ padding: '28px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-                    <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65, maxWidth: 380 }}>Complete 5+ practice messages with coaching to unlock your full skill profile — strengths, weak spots, improvement rate.</p>
-                    <Link href="/practice">
-                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                        style={{ background: C.violetLo, border: `1px solid ${C.violetHi}`, color: C.violetBr, borderRadius: 11, padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                        Start Practicing
+                  <div style={{ padding: '36px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
+                    <p style={{ fontSize: 15, color: '#444', lineHeight: 1.6, maxWidth: 440, fontWeight: 600, margin: 0 }}>Complete 5+ practice messages with coaching to unlock your full skill profile — strengths, weak spots, and exact improvement rates.</p>
+                    <Link href="/practice" style={{ textDecoration: 'none' }}>
+                      <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                        style={{ background: C.ink, border: 'none', color: C.white, borderRadius: 12, padding: '14px 28px', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}>
+                        Start Practicing →
                       </motion.button>
                     </Link>
                   </div>
                 ) : (
                   <div className="profile-inner">
                     {/* Strengths */}
-                    <div style={{ padding: '18px 20px', borderRight: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: 9, color: C.green, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 14 }}>✓ Strengths</div>
+                    <div style={{ padding: '24px', borderRight: C.borderThin }}>
+                      <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><div style={{width:8,height:8,background:C.green,borderRadius:'50%',border:'1px solid #000'}}/> Strengths</div>
                       {data.skillProfile.strengths.length === 0 ? (
-                        <p style={{ fontSize: 12, color: C.muted }}>None detected yet</p>
+                        <p style={{ fontSize: 13, color: '#666', fontWeight: 600 }}>None detected yet</p>
                       ) : data.skillProfile.strengths.map((str, i) => {
                         const max = data.skillProfile!.strengths[0].count;
                         return (
-                          <div key={str.flag} style={{ marginBottom: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-                              <span style={{ color: C.text, fontWeight: 500 }}>{str.label}</span>
-                              <span className="mono" style={{ color: C.green, fontWeight: 700, fontSize: 11 }}>{str.count}×</span>
+                          <div key={str.flag} style={{ marginBottom: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, fontWeight: 700, color: C.ink }}>
+                              <span>{str.label}</span>
+                              <span>{str.count}×</span>
                             </div>
-                            <Bar pct={(str.count / max) * 100} color={C.green} delay={0.1 + i * 0.06} h={2} />
+                            <Bar pct={(str.count / max) * 100} color={C.green} delay={0.1 + i * 0.06} h={6} />
                           </div>
                         );
                       })}
                     </div>
                     {/* Weaknesses */}
-                    <div style={{ padding: '18px 20px', borderRight: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: 9, color: C.red, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 14 }}>✗ Needs Work</div>
+                    <div style={{ padding: '24px', borderRight: C.borderThin }}>
+                      <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><div style={{width:8,height:8,background:C.red,borderRadius:'50%',border:'1px solid #000'}}/> Needs Work</div>
                       {data.skillProfile.weaknesses.length === 0 ? (
-                        <p style={{ fontSize: 12, color: C.muted }}>No consistent issues</p>
+                        <p style={{ fontSize: 13, color: '#666', fontWeight: 600 }}>No consistent issues</p>
                       ) : data.skillProfile.weaknesses.map((w, i) => {
                         const max = data.skillProfile!.weaknesses[0].count;
                         return (
-                          <div key={w.flag} style={{ marginBottom: 12 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-                              <span style={{ color: C.text, fontWeight: 500 }}>{w.label}</span>
-                              <span className="mono" style={{ color: C.red, fontWeight: 700, fontSize: 11 }}>{w.count}×</span>
+                          <div key={w.flag} style={{ marginBottom: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, fontWeight: 700, color: C.ink }}>
+                              <span>{w.label}</span>
+                              <span>{w.count}×</span>
                             </div>
-                            <Bar pct={(w.count / max) * 100} color={C.red} delay={0.1 + i * 0.06} h={2} />
+                            <Bar pct={(w.count / max) * 100} color={C.red} delay={0.1 + i * 0.06} h={6} />
                           </div>
                         );
                       })}
                     </div>
                     {/* Meta stats */}
-                    <div style={{ padding: '18px 20px' }}>
-                      <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 14 }}>Stats</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ padding: '24px', background: C.bgCream }}>
+                      <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 20 }}>Metadata</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                         {data.skillProfile.improvement != null && (
-                          <div>
-                            <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Improvement</div>
-                            <div className="mono" style={{ fontSize: 22, fontWeight: 800, color: data.skillProfile.improvement > 0 ? C.green : data.skillProfile.improvement < 0 ? C.red : C.muted, lineHeight: 1 }}>
-                              {data.skillProfile.improvement > 0 ? '+' : ''}{data.skillProfile.improvement}
+                          <div style={{ background: C.white, border: C.borderThin, padding: '16px', borderRadius: 12 }}>
+                            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, fontWeight: 800 }}>Improvement Trend</div>
+                            <div style={{ fontSize: 28, fontWeight: 900, color: data.skillProfile.improvement > 0 ? C.green : data.skillProfile.improvement < 0 ? C.red : C.ink, lineHeight: 1 }}>
+                              {data.skillProfile.improvement > 0 ? '+' : ''}{data.skillProfile.improvement} <span style={{ fontSize: 12, color: C.ink }}>pts</span>
                             </div>
-                            <div style={{ fontSize: 10, color: C.muted }}>pts avg</div>
                           </div>
                         )}
                         {data.skillProfile.topCharacter && (
-                          <div>
-                            <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Most Practiced</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{CHAR_LABELS[data.skillProfile.topCharacter] ?? data.skillProfile.topCharacter}</div>
+                          <div style={{ background: C.white, border: C.borderThin, padding: '16px', borderRadius: 12 }}>
+                            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, fontWeight: 800 }}>Primary Opponent</div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{CHAR_LABELS[data.skillProfile.topCharacter] ?? data.skillProfile.topCharacter}</div>
                           </div>
                         )}
-                        <div>
-                          <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Msgs Scored</div>
-                          <div className="mono" style={{ fontSize: 22, fontWeight: 800, color: C.violetBr, lineHeight: 1 }}>{data.skillProfile.totalScoredMessages}</div>
+                        <div style={{ background: C.white, border: C.borderThin, padding: '16px', borderRadius: 12 }}>
+                          <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, fontWeight: 800 }}>Total Scored Msgs</div>
+                          <div style={{ fontSize: 28, fontWeight: 900, color: C.ink, lineHeight: 1 }}>{data.skillProfile.totalScoredMessages}</div>
                         </div>
                       </div>
                     </div>
@@ -703,69 +656,39 @@ export default function DashboardPage() {
                 )}
               </div>
             ) : (
-              <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 24 }}>
                 <Lock
-                  title="Skill Profile — Premium"
-                  desc="See your practice strengths, weak spots, improvement trend, and personalized coaching insights."
+                  title="Skill Profile Dossier"
+                  desc="Upgrade to Premium to see your practice strengths, weak spots, improvement trends, and personalized coaching insights."
                 />
               </div>
             )}
           </Reveal>
 
-          {/* ── ACTIVITY CALENDAR ────────────────────────────────────── */}
-          <Reveal delay={0.22}>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '18px 20px', marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 4 }}>Activity · Last 28 Days</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div className="mono" style={{ fontSize: 20, fontWeight: 800, color: C.violet }}>{s?.streak ?? 0}d</div>
-                    <div style={{ fontSize: 12, color: C.muted }}>current streak</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(255,255,255,0.04)' }} />
-                  <span style={{ fontSize: 10, color: C.muted }}>No activity</span>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: C.violet, marginLeft: 8 }} />
-                  <span style={{ fontSize: 10, color: C.muted }}>Active</span>
-                </div>
-              </div>
-              <StreakCalendar analyses={data?.recentAnalyses ?? []} />
-            </div>
-          </Reveal>
-
-          {/* ── RECHARTS: SCORE TREND ──────────────────────────────── */}
+          {/* ── RECHARTS: SCORE TREND (Brutalist) ────────────────────── */}
           {scores.length >= 2 && (
             <Reveal delay={0.24}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 22, padding: '20px 22px', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ background: C.white, border: C.border, borderRadius: 24, padding: 'clamp(20px,4vw,32px)', marginBottom: 24, boxShadow: C.shadow }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
                   <div>
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 4 }}>Score Trend · All Analyses</div>
-                    <div style={{ fontSize: 12, color: C.muted2 }}>Your conversation scores over time</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.violet }} />
-                    <span style={{ fontSize: 10, color: C.muted }}>Score</span>
+                    <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 8 }}>Score Trend</div>
+                    <div style={{ fontSize: 14, color: '#555', fontWeight: 600 }}>Your conversation scores over time</div>
                   </div>
                 </div>
-                <div style={{ width: '100%', height: 200 }}>
+                <div style={{ width: '100%', height: 240, background: C.bgCream, border: C.borderThin, borderRadius: 16, padding: '16px 16px 0 0' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data?.scoreHistory ?? []} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
-                      <defs>
-                        <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={C.violet} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={C.violet} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgba(240,237,232,0.25)' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: 'rgba(240,237,232,0.25)' }} axisLine={false} tickLine={false} />
+                    <LineChart data={data?.scoreHistory ?? []} margin={{ top: 5, right: 15, bottom: 5, left: -20 }}>
+                      <CartesianGrid stroke={C.ink} strokeDasharray="3 3" opacity={0.15} vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#666', fontWeight: 700 }} axisLine={{ stroke: C.ink, strokeWidth: 2 }} tickLine={false} dy={10} />
+                      <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#666', fontWeight: 700 }} axisLine={false} tickLine={false} />
                       <RechartsTooltip
-                        contentStyle={{ background: '#1A1A28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12, color: '#F0EDE8' }}
-                        labelStyle={{ color: 'rgba(240,237,232,0.5)', fontSize: 10, marginBottom: 4 }}
+                        contentStyle={{ background: C.white, border: C.borderThin, borderRadius: 8, fontSize: 14, color: C.ink, fontWeight: 900, boxShadow: C.shadowSm }}
+                        itemStyle={{ color: C.red }}
+                        labelStyle={{ color: '#666', fontSize: 11, marginBottom: 4, textTransform: 'uppercase' }}
                         formatter={(value: number) => [value.toFixed(1), 'Score']}
                       />
-                      <Area type="monotone" dataKey="score" stroke={C.violet} strokeWidth={2} fill="url(#scoreGrad)" dot={false} activeDot={{ r: 4, fill: C.violet, stroke: C.bg, strokeWidth: 2 }} />
-                    </AreaChart>
+                      <Line type="monotone" dataKey="score" stroke={C.red} strokeWidth={4} dot={{ r: 5, fill: C.white, stroke: C.ink, strokeWidth: 2 }} activeDot={{ r: 7, fill: C.red, stroke: C.ink, strokeWidth: 2 }} />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -774,31 +697,31 @@ export default function DashboardPage() {
 
           {/* ── HISTORY TABS ─────────────────────────────────────────── */}
           <Reveal delay={0.26}>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 22, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{ background: C.white, border: C.border, borderRadius: 24, overflow: 'hidden', marginBottom: 24, boxShadow: C.shadow }}>
               {/* Tab bar */}
-              <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: 'flex', borderBottom: C.borderThin, background: C.bgCream }}>
                 {(['analyses', 'practice'] as const).map(t => (
                   <button key={t} onClick={() => setHistTab(t)}
-                    style={{ flex: 1, padding: '14px 18px', background: histTab === t ? C.surfaceHi : 'transparent', border: 'none', borderBottom: `2px solid ${histTab === t ? C.violet : 'transparent'}`, color: histTab === t ? C.text : C.muted, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s', fontFamily: "'DM Sans',sans-serif" }}>
+                    style={{ flex: 1, padding: '18px', background: histTab === t ? C.white : 'transparent', border: 'none', borderRight: t === 'analyses' ? C.borderThin : 'none', color: C.ink, fontSize: 13, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer', transition: 'background 0.2s', fontFamily: "'DM Sans',sans-serif", borderBottom: histTab === t ? `4px solid ${C.red}` : '4px solid transparent' }}>
                     {t === 'analyses' ? 'Chat Analyses' : isPremium ? 'Practice Sessions' : '🔒 Practice'}
                   </button>
                 ))}
               </div>
 
               <AnimatePresence mode="wait">
-                <motion.div key={histTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                <motion.div key={histTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
 
                   {/* ANALYSES tab */}
                   {histTab === 'analyses' && (
                     <div>
                       {!data?.recentAnalyses.length ? (
-                        <div style={{ textAlign: 'center', padding: '52px 24px' }}>
-                          <div style={{ fontSize: 32, marginBottom: 12 }}>📱</div>
-                          <div style={{ fontSize: 13, color: C.muted, marginBottom: 18 }}>No analyses yet</div>
-                          <Link href="/upload">
-                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                              style={{ background: C.text, color: C.bg, border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif" }}>
-                              Analyze first chat →
+                        <div style={{ textAlign: 'center', padding: '64px 24px' }}>
+                          <div style={{ fontSize: 40, marginBottom: 16 }}>📱</div>
+                          <div style={{ fontSize: 15, color: '#555', marginBottom: 24, fontWeight: 600 }}>No analyses logged yet.</div>
+                          <Link href="/upload" style={{ textDecoration: 'none' }}>
+                            <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                              style={{ background: C.ink, color: C.white, border: 'none', borderRadius: 12, padding: '12px 24px', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                              Analyze First Chat →
                             </motion.button>
                           </Link>
                         </div>
@@ -809,35 +732,36 @@ export default function DashboardPage() {
                         return (
                           <motion.div key={a._id} className="hist-row"
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', borderBottom: i < data.recentAnalyses.length - 1 ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap', transition: 'background 0.14s' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px', borderBottom: i < data.recentAnalyses.length - 1 ? C.borderThin : 'none', flexWrap: 'wrap' }}>
                             {/* Score bubble */}
-                            <div style={{ width: 44, height: 44, borderRadius: 12, background: scc + '14', border: `1px solid ${scc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <span className="mono" style={{ fontSize: 14, fontWeight: 800, color: scc }}>{sc.toFixed(1)}</span>
+                            <div style={{ width: 56, height: 56, borderRadius: 14, background: C.bgCream, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: C.shadowSm }}>
+                              <span style={{ fontSize: 18, fontWeight: 900, color: scc, fontFamily: "'DM Sans',sans-serif" }}>{sc.toFixed(1)}</span>
                             </div>
-                            {/* Mini score bar + date */}
-                            <div style={{ flex: '1 1 80px', minWidth: 60 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted2, marginBottom: 5 }}>
+                            
+                            {/* Date */}
+                            <div style={{ flex: '1 1 100px', minWidth: 80 }}>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: C.ink, marginBottom: 6 }}>
                                 {dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                <span style={{ color: C.muted, marginLeft: 6 }}>{dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                               </div>
-                              <Bar pct={(sc / 10) * 100} color={scc} delay={0.05 + i * 0.04} h={2} />
+                              <div style={{ fontSize: 12, color: '#666', fontWeight: 600 }}>{dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
                             </div>
+
                             {/* Metrics */}
-                            <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-                              <div style={{ textAlign: 'center' }}>
-                                <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: C.coral }}>{a.interestLevel}%</div>
-                                <div style={{ fontSize: 8, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>Interest</div>
+                            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{ textAlign: 'center', background: C.bgCream, border: C.borderThin, padding: '8px 16px', borderRadius: 10 }}>
+                                <div style={{ fontSize: 16, fontWeight: 900, color: C.ink }}>{a.interestLevel}%</div>
+                                <div style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, fontWeight: 800 }}>Interest</div>
                               </div>
                               {a.attractionProbability != null && (
-                                <div style={{ textAlign: 'center' }}>
-                                  <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: C.gold }}>{a.attractionProbability}%</div>
-                                  <div style={{ fontSize: 8, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>Attract</div>
+                                <div style={{ textAlign: 'center', background: C.bgCream, border: C.borderThin, padding: '8px 16px', borderRadius: 10 }}>
+                                  <div style={{ fontSize: 16, fontWeight: 900, color: C.red }}>{a.attractionProbability}%</div>
+                                  <div style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, fontWeight: 800 }}>Attract</div>
                                 </div>
                               )}
                               {a.missedOpportunities > 0 && (
-                                <div style={{ textAlign: 'center' }}>
-                                  <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: C.muted2 }}>{a.missedOpportunities}</div>
-                                  <div style={{ fontSize: 8, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>Missed</div>
+                                <div style={{ textAlign: 'center', background: C.bgCream, border: C.borderThin, padding: '8px 16px', borderRadius: 10 }}>
+                                  <div style={{ fontSize: 16, fontWeight: 900, color: C.blue }}>{a.missedOpportunities}</div>
+                                  <div style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, fontWeight: 800 }}>Missed</div>
                                 </div>
                               )}
                               <MTag val={a.conversationMomentum} />
@@ -852,50 +776,50 @@ export default function DashboardPage() {
                   {histTab === 'practice' && (
                     <div>
                       {!isPremium ? (
-                        <div style={{ padding: '32px 24px 28px' }}>
+                        <div style={{ padding: '40px 24px' }}>
                           <Lock
-                            title="Practice tracking is premium"
-                            desc="Track every session, see improvement over time, unlock your skill profile."
-                            compact
+                            title="Practice History Locked"
+                            desc="Premium members can track every practice session, see their improvement over time, and unlock their full skill profile."
                           />
                         </div>
                       ) : !data?.practiceSessions.length ? (
-                        <div style={{ textAlign: 'center', padding: '52px 24px' }}>
-                          <div style={{ fontSize: 32, marginBottom: 12 }}>🎭</div>
-                          <div style={{ fontSize: 13, color: C.muted, marginBottom: 18 }}>No practice sessions yet</div>
-                          <Link href="/practice">
-                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                              style={{ background: C.text, color: C.bg, border: 'none', borderRadius: 11, padding: '11px 22px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif" }}>
-                              Start first session →
+                        <div style={{ textAlign: 'center', padding: '64px 24px' }}>
+                          <div style={{ fontSize: 40, marginBottom: 16 }}>🎭</div>
+                          <div style={{ fontSize: 15, color: '#555', marginBottom: 24, fontWeight: 600 }}>No practice sessions completed yet.</div>
+                          <Link href="/practice" style={{ textDecoration: 'none' }}>
+                            <motion.button whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                              style={{ background: C.ink, color: C.white, border: 'none', borderRadius: 12, padding: '12px 24px', fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                              Start Practicing →
                             </motion.button>
                           </Link>
                         </div>
                       ) : data.practiceSessions.map((p, i) => {
-                        const dc = { easy: C.green, normal: C.gold, hard: C.red }[p.difficulty] ?? C.muted;
-                        const ic = p.currentInterest >= 60 ? C.green : p.currentInterest >= 35 ? C.gold : C.red;
+                        const dc = { easy: C.green, normal: C.yellow, hard: C.red }[p.difficulty] ?? C.muted;
+                        const ic = p.currentInterest >= 60 ? C.green : p.currentInterest >= 35 ? C.yellow : C.red;
                         const charLabel = CHAR_LABELS[p.characterType] ?? p.characterType;
                         return (
                           <motion.div key={p._id} className="hist-row"
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 20px', borderBottom: i < data.practiceSessions.length - 1 ? `1px solid ${C.border}` : 'none', flexWrap: 'wrap', transition: 'background 0.14s' }}>
-                            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.goldLo, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎭</div>
-                            <div style={{ flex: '1 1 100px', minWidth: 80 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{charLabel}</div>
-                              <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 4, background: dc + '18', color: dc, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{p.difficulty}</span>
+                            style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px', borderBottom: i < data.practiceSessions.length - 1 ? C.borderThin : 'none', flexWrap: 'wrap' }}>
+                            
+                            <div style={{ width: 56, height: 56, borderRadius: 14, background: C.bgCream, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0, boxShadow: C.shadowSm }}>🎭</div>
+                            
+                            <div style={{ flex: '1 1 140px', minWidth: 100 }}>
+                              <div style={{ fontSize: 15, fontWeight: 900, color: C.ink, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{charLabel}</div>
+                              <span style={{ fontSize: 10, fontWeight: 900, padding: '4px 10px', borderRadius: 6, background: C.white, border: `1px solid #000`, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{p.difficulty}</span>
                             </div>
-                            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                              <div style={{ textAlign: 'center' }}>
-                                <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: C.violetBr }}>{p.messageCount}</div>
-                                <div style={{ fontSize: 8, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>Msgs</div>
+
+                            <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <div style={{ textAlign: 'center', background: C.bgCream, border: C.borderThin, padding: '8px 16px', borderRadius: 10 }}>
+                                <div style={{ fontSize: 16, fontWeight: 900, color: C.blue }}>{p.messageCount}</div>
+                                <div style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, fontWeight: 800 }}>Msgs</div>
                               </div>
-                              <div style={{ textAlign: 'center' }}>
-                                <div className="mono" style={{ fontSize: 14, fontWeight: 800, color: ic }}>{p.currentInterest}%</div>
-                                <div style={{ fontSize: 8, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>Interest</div>
+                              <div style={{ textAlign: 'center', background: C.bgCream, border: C.borderThin, padding: '8px 16px', borderRadius: 10 }}>
+                                <div style={{ fontSize: 16, fontWeight: 900, color: ic }}>{p.currentInterest}%</div>
+                                <div style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, fontWeight: 800 }}>Interest</div>
                               </div>
-                              <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: 11, color: C.muted }}>
-                                  {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </div>
+                              <div style={{ fontSize: 12, color: '#666', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
+                                {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </div>
                             </div>
                           </motion.div>
@@ -911,70 +835,72 @@ export default function DashboardPage() {
           {/* ── PREMIUM UPGRADE BLOCK (free users) ──────────────────── */}
           {!isPremium && (
             <Reveal delay={0.30}>
-              <div style={{ background: `linear-gradient(135deg, rgba(123,108,246,0.08), rgba(245,200,66,0.05))`, border: `1px solid ${C.violet}30`, borderRadius: 20, padding: 'clamp(20px,4vw,32px)', marginBottom: 10, position: 'relative', overflow: 'hidden' }}>
+              <div style={{ background: C.red, border: C.border, borderRadius: 24, padding: 'clamp(24px,5vw,40px)', marginBottom: 24, position: 'relative', overflow: 'hidden', boxShadow: C.shadowLg }}>
                 {/* Large background text */}
-                <div style={{ position: 'absolute', right: -20, bottom: -30, fontSize: 120, fontWeight: 900, opacity: 0.03, color: C.violet, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>PRO</div>
+                <div style={{ position: 'absolute', right: -10, bottom: -20, fontSize: 140, fontWeight: 900, opacity: 0.1, color: C.ink, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>PRO</div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24, position: 'relative', zIndex: 1 }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: C.violet, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 800, marginBottom: 10 }}>Upgrade to Premium</div>
-                    <h3 style={{ fontSize: 'clamp(22px,4vw,30px)', fontWeight: 800, letterSpacing: '-0.025em', color: C.text, marginBottom: 10, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1.1 }}>
-                      You're seeing<br />10% of what we know.
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 32, position: 'relative', zIndex: 1 }}>
+                  <div style={{ flex: '1 1 300px' }}>
+                    <div style={{ fontSize: 11, color: C.yellow, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 900, marginBottom: 12 }}>Upgrade to Premium</div>
+                    <h3 style={{ fontSize: 'clamp(28px,5vw,42px)', fontWeight: 900, letterSpacing: '-0.03em', color: C.white, marginBottom: 20, fontFamily: "'DM Sans',sans-serif", lineHeight: 1.1 }}>
+                      You're seeing 10%<br />of what we know.
                     </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       {[
-                        { icon: '∞', text: 'Unlimited chat analyses', color: C.violetBr },
-                        { icon: '🎭', text: 'All 10 AI practice characters', color: C.coral },
-                        { icon: '📈', text: 'Full skill profile + improvement tracking', color: C.green },
-                        { icon: '💡', text: 'Attraction signals, rewrites, missed moments', color: C.gold },
+                        { text: 'Unlimited chat analyses' },
+                        { text: 'All 10 AI practice characters' },
+                        { text: 'Full skill profile & improvement tracking' },
+                        { text: 'Attraction signals, rewrites & missed moments' },
                       ].map((f, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: f.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, flexShrink: 0 }}>{f.icon}</div>
-                          <span style={{ fontSize: 13, color: C.muted2 }}>{f.text}</span>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ width: 24, height: 24, borderRadius: '50%', background: C.white, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Check style={{ width: 14, height: 14, color: C.ink }} />
+                          </div>
+                          <span style={{ fontSize: 15, color: C.white, fontWeight: 700 }}>{f.text}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div style={{ flexShrink: 0 }}>
-                    <div style={{ background: C.paper, border: `1px solid ${C.borderHi}`, borderRadius: 16, padding: '22px 24px', minWidth: 180, textAlign: 'center', marginBottom: 12 }}>
-                      <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, marginBottom: 8 }}>Launch Price</div>
-                      <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontSize: 46, fontWeight: 900, color: C.text, lineHeight: 1, letterSpacing: '-0.04em' }}>₹99</div>
-                      <div style={{ fontSize: 12, color: C.muted, marginBottom: 16 }}>/month · cancel anytime</div>
-                      <Link href="/upgrade">
-                        <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                          style={{ width: '100%', background: C.violet, color: '#fff', border: 'none', borderRadius: 11, padding: '12px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Bricolage Grotesque',sans-serif" }}>
+                  <div style={{ flexShrink: 0, width: '100%', maxWidth: 280 }}>
+                    <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', textAlign: 'center', marginBottom: 16, boxShadow: C.shadow }}>
+                      <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 12 }}>Launch Price</div>
+                      <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 56, fontWeight: 900, color: C.ink, lineHeight: 1, letterSpacing: '-0.04em' }}>₹99</div>
+                      <div style={{ fontSize: 13, color: '#666', marginBottom: 20, fontWeight: 600, marginTop: 8 }}>/month · cancel anytime</div>
+                      <Link href="/upgrade" style={{ textDecoration: 'none' }}>
+                        <motion.button whileHover={{ y: -3, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
+                          style={{ width: '100%', background: C.yellow, color: C.ink, border: C.border, borderRadius: 12, padding: '16px 20px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
                           Upgrade Now →
                         </motion.button>
                       </Link>
                     </div>
-                    <div style={{ fontSize: 10, color: C.muted, textAlign: 'center', lineHeight: 1.5 }}>No screenshots stored · Secured by Razorpay</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontWeight: 600 }}>No screenshots stored · Secure checkout</div>
                   </div>
                 </div>
               </div>
             </Reveal>
           )}
 
-          {/* ── RESET OWN DATA (both tiers) ─────────────────────────── */}
+          {/* ── RESET OWN DATA ─────────────────────────── */}
           <Reveal delay={0.34}>
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, paddingBottom: 10 }}>
-              <AnimatePresence>
+            <div style={{ borderTop: C.border, paddingTop: 24, paddingBottom: 24 }}>
+              <AnimatePresence mode="wait">
                 {!resetConfirm ? (
-                  <button onClick={() => setResetConfirm(true)} className="qbtn"
-                    style={{ background: 'none', border: 'none', color: C.muted, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity 0.15s' }}>
-                    <span style={{ fontSize: 10 }}>⚠</span> Reset my data
+                  <button onClick={() => setResetConfirm(true)} 
+                    style={{ background: 'none', border: 'none', color: '#666', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'color 0.2s' }}>
+                    <AlertTriangle style={{ width: 14, height: 14 }} /> Reset my data
                   </button>
                 ) : (
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: C.red }}>Delete all your analyses and practice sessions? Cannot be undone.</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', background: '#FFF0F0', border: C.borderThin, padding: '16px', borderRadius: 12 }}>
+                    <span style={{ fontSize: 14, color: C.red, fontWeight: 700 }}>Delete all your analyses and practice sessions? Cannot be undone.</span>
+                    <div style={{ display: 'flex', gap: 10 }}>
                       <button onClick={() => { /* call API */ setResetConfirm(false); }}
-                        style={{ background: C.redLo, border: `1px solid ${C.red}40`, color: C.red, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        style={{ background: C.red, border: C.borderThin, color: C.white, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 900, cursor: 'pointer' }}>
                         Yes, delete
                       </button>
                       <button onClick={() => setResetConfirm(false)}
-                        style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
+                        style={{ background: C.white, border: C.borderThin, color: C.ink, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
                         Cancel
                       </button>
                     </div>

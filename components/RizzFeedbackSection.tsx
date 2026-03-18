@@ -11,16 +11,26 @@ const PolarAngleAxis = dynamic(() => import('recharts').then(m => m.PolarAngleAx
 const Radar = dynamic(() => import('recharts').then(m => m.Radar), { ssr: false });
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
 
-// ─── Design ──────────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS — Neo-Brutalism ───────────────────────────────────────────
 const C = {
-  bg: '#08080F', surface: 'rgba(255,255,255,0.03)', surfaceHi: 'rgba(255,255,255,0.055)',
-  border: 'rgba(255,255,255,0.07)', borderHi: 'rgba(255,255,255,0.14)',
-  text: '#F0EDE8', muted: 'rgba(240,237,232,0.3)', muted2: 'rgba(240,237,232,0.55)',
-  coral: '#FF5B3A', coralLo: 'rgba(255,91,58,0.1)', coralHi: 'rgba(255,91,58,0.18)',
-  violet: '#7B6CF6', violetLo: 'rgba(123,108,246,0.1)',
-  green: '#4DEBA1', greenLo: 'rgba(77,235,161,0.08)',
-  gold: '#F5C842', goldLo: 'rgba(245,200,66,0.08)',
+  cream:     '#F3EDE2',
+  ink:       '#0F0C09',
+  red:       '#D13920',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  warm1:     '#E8E0D2',
+  warm2:     '#D4CBBA',
+  muted:     '#8A8074',
+  shadow:    '4px 4px 0px #0F0C09',
+  shadowLg:  '8px 8px 0px #0F0C09',
+  shadowSm:  '2px 2px 0px #0F0C09',
+  border:    '3px solid #0F0C09',
+  borderThin:'2px solid #0F0C09',
 };
+
+const SNAP = { duration: 0.18, ease: [0.2, 0, 0.2, 1] } as const;
 
 interface FeedbackData {
   total: number;
@@ -36,18 +46,18 @@ interface AISummary {
   summary: { strength: string; weakness: string; tip: string } | null;
 }
 
-function ScoreRing({ score, size = 100 }: { score: number; size?: number }) {
-  const r = size / 2 - 8;
+function ScoreRing({ score, size = 110 }: { score: number; size?: number }) {
+  const r = size / 2 - 10;
   const circ = 2 * Math.PI * r;
   const pct = score / 100;
-  const color = score >= 70 ? C.green : score >= 45 ? C.gold : C.coral;
+  const color = score >= 70 ? C.green : score >= 45 ? C.yellow : C.red;
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={6} />
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0, background: C.white, borderRadius: '50%', border: C.borderThin, boxShadow: C.shadowSm }}>
+      <svg width={size} height={size} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.warm1} strokeWidth={8} />
         <motion.circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={6}
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={8}
           strokeLinecap="round"
           initial={{ strokeDasharray: `0 ${circ}` }}
           animate={{ strokeDasharray: `${pct * circ} ${circ}` }}
@@ -55,8 +65,8 @@ function ScoreRing({ score, size = 100 }: { score: number; size?: number }) {
         />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: size > 80 ? 22 : 16, fontWeight: 900, color, fontFamily: "'Bricolage Grotesque',sans-serif", lineHeight: 1 }}>{score}</span>
-        <span style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>/ 100</span>
+        <span style={{ fontSize: size > 80 ? 28 : 18, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif", lineHeight: 1, letterSpacing: '-0.04em' }}>{score}</span>
+        <span style={{ fontSize: 10, color: C.muted, marginTop: 2, fontWeight: 800 }}>/ 100</span>
       </div>
     </div>
   );
@@ -65,17 +75,17 @@ function ScoreRing({ score, size = 100 }: { score: number; size?: number }) {
 function TraitBar({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = (value / 10) * 100;
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-        <span style={{ fontSize: 12, color: C.muted2, fontWeight: 500 }}>{label}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: 'monospace' }}>{value.toFixed(1)}</span>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: C.ink, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'DM Sans',sans-serif" }}>{label}</span>
+        <span style={{ fontSize: 12, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans',sans-serif" }}>{value.toFixed(1)}</span>
       </div>
-      <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+      <div style={{ height: 12, background: C.warm1, border: C.borderThin, borderRadius: 6, overflow: 'hidden' }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-          style={{ height: '100%', background: color, borderRadius: 3 }}
+          style={{ height: '100%', background: color, borderRight: C.borderThin }}
         />
       </div>
     </div>
@@ -114,20 +124,21 @@ export default function RizzFeedbackSection() {
 
   if (loading) {
     return (
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '24px', marginBottom: 10 }}>
-        <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 16 }}>Rizz Feedback</div>
-        <div style={{ fontSize: 13, color: C.muted }}>Loading...</div>
+      <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '24px', boxShadow: C.shadow }}>
+        <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 16 }}>Community Feedback</div>
+        <div style={{ fontSize: 14, color: C.ink, fontWeight: 600 }}>Loading incoming data...</div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '24px 22px', marginBottom: 10 }}>
-        <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 14 }}>Rizz Feedback</div>
-        <div style={{ fontSize: 13, color: C.muted2, lineHeight: 1.6 }}>
-          No feedback yet. Share your Rizz Link to collect anonymous trait ratings from others.
-        </div>
+      <div style={{ background: C.white, border: C.border, borderRadius: 20, padding: '32px 24px', boxShadow: C.shadow, textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>📭</div>
+        <h3 style={{ fontSize: 20, color: C.ink, fontWeight: 900, marginBottom: 8, fontFamily: "'DM Sans',sans-serif" }}>No Feedback Yet</h3>
+        <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, fontWeight: 500, maxWidth: 400, margin: '0 auto' }}>
+          Share your Rizz Link to collect anonymous trait ratings and messages from others.
+        </p>
       </div>
     );
   }
@@ -143,69 +154,84 @@ export default function RizzFeedbackSection() {
     { trait: 'Not Dry', score: (10 - averages.dryText) * 10 },
   ];
 
-  const traitColor = (val: number) => val >= 7 ? C.green : val >= 4.5 ? C.gold : C.coral;
+  const traitColor = (val: number) => val >= 7 ? C.green : val >= 4.5 ? C.yellow : C.red;
   const dryRisk = averages.dryText >= 7 ? 'High' : averages.dryText >= 5 ? 'Medium' : 'Low';
-  const dryColor = averages.dryText >= 7 ? C.coral : averages.dryText >= 5 ? C.gold : C.green;
+  const dryColor = averages.dryText >= 7 ? C.red : averages.dryText >= 5 ? C.yellow : C.green;
 
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '22px', overflow: 'hidden' }}>
-        <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: 18, fontFamily: "'DM Sans',sans-serif" }}>
-          Rizz Feedback · {data.total} response{data.total !== 1 ? 's' : ''}
+    <div style={{ background: C.white, border: C.border, borderRadius: 24, overflow: 'hidden', boxShadow: C.shadow }}>
+      
+      {/* Header */}
+      <div style={{ padding: '24px', borderBottom: C.borderThin, background: C.bgCream, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.blue, border: '1px solid #000' }} />
+          Anonymous Feedback
         </div>
+        <div style={{ background: C.white, border: C.borderThin, padding: '4px 12px', borderRadius: 10, fontSize: 11, fontWeight: 900, color: C.ink, boxShadow: C.shadowSm }}>
+          {data.total} Response{data.total !== 1 ? 's' : ''}
+        </div>
+      </div>
 
-        {/* Score + Traits */}
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 20 }}>
-          {/* Ring */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <ScoreRing score={data.rizzScore} size={96} />
-            <span style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>Rizz Score</span>
+      <div style={{ padding: '32px 24px' }}>
+        {/* Score + Traits Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 32, marginBottom: 32, alignItems: 'center' }}>
+          
+          {/* Left: Overall Ring & Dry Risk */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <ScoreRing score={data.rizzScore} size={120} />
+              <span style={{ fontSize: 12, color: C.ink, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Aggregate Rizz Score</span>
+            </div>
+            
+            <div style={{ background: C.bgCream, border: C.borderThin, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 220, boxShadow: C.shadowSm }}>
+              <span style={{ fontSize: 12, color: C.ink, fontWeight: 900, textTransform: 'uppercase' }}>Dry Risk</span>
+              <span style={{ fontSize: 12, fontWeight: 900, color: C.ink, background: dryColor, padding: '4px 12px', borderRadius: 8, border: C.borderThin }}>{dryRisk}</span>
+            </div>
           </div>
 
-          {/* Trait bars */}
-          <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Right: Trait Bars */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <TraitBar label="Humor" value={averages.humor} color={traitColor(averages.humor)} />
             <TraitBar label="Flirting" value={averages.flirting} color={traitColor(averages.flirting)} />
             <TraitBar label="Confidence" value={averages.confidence} color={traitColor(averages.confidence)} />
-            <TraitBar label="Overall Rizz" value={averages.overall} color={traitColor(averages.overall)} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: C.muted2, fontWeight: 500 }}>Dry Texting Risk</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: dryColor, background: dryColor + '18', padding: '2px 10px', borderRadius: 6 }}>{dryRisk}</span>
-            </div>
+            <TraitBar label="Overall Impression" value={averages.overall} color={traitColor(averages.overall)} />
           </div>
         </div>
 
         {/* Radar Chart */}
         {data.total >= 3 && (
-          <div style={{ height: 180, marginBottom: 16 }}>
+          <div style={{ height: 240, marginBottom: 32, background: C.bgCream, border: C.borderThin, borderRadius: 16, padding: '16px', boxShadow: C.shadowSm }}>
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
-                <PolarGrid stroke="rgba(255,255,255,0.06)" />
-                <PolarAngleAxis dataKey="trait" tick={{ fill: 'rgba(240,237,232,0.35)', fontSize: 10, fontWeight: 600 }} />
-                <Radar dataKey="score" stroke={C.violet} fill={C.violet} fillOpacity={0.15} strokeWidth={1.5} />
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                <PolarGrid stroke={C.ink} strokeOpacity={0.2} />
+                <PolarAngleAxis dataKey="trait" tick={{ fill: C.ink, fontSize: 11, fontWeight: 900, fontFamily: "'DM Sans', sans-serif" }} />
+                <Radar dataKey="score" stroke={C.ink} strokeWidth={3} fill={C.yellow} fillOpacity={0.8} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* AI Summary */}
-        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginBottom: 16 }}>
-          <button
+        {/* AI Summary Button */}
+        <div style={{ marginBottom: 24 }}>
+          <motion.button
+            whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
             onClick={loadAI}
             style={{
-              width: '100%', background: showAI ? C.surfaceHi : C.violetLo,
-              border: `1px solid ${showAI ? C.border : C.violet + '30'}`,
-              borderRadius: 12, padding: '11px 18px',
-              fontSize: 12, fontWeight: 700, color: showAI ? C.muted2 : C.violet,
+              width: '100%', background: showAI ? C.white : C.blue,
+              border: C.borderThin, borderRadius: 14, padding: '16px 20px',
+              fontSize: 14, fontWeight: 900, color: showAI ? C.ink : C.white,
               cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", textAlign: 'left',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              boxShadow: showAI ? 'none' : C.shadowSm, transition: 'background 0.2s',
             }}
           >
-            <span>✦ AI Social Perception Summary</span>
-            <span style={{ fontSize: 11, color: C.muted }}>
-              {aiLoading ? 'Analyzing...' : showAI ? '▲ Hide' : '▼ Show'}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🤖</span> AI Perception Analysis
             </span>
-          </button>
+            <span style={{ fontSize: 12, fontWeight: 800 }}>
+              {aiLoading ? 'Analyzing...' : showAI ? '▲ Close' : '▼ Reveal'}
+            </span>
+          </motion.button>
 
           <AnimatePresence>
             {showAI && ai && (
@@ -213,27 +239,33 @@ export default function RizzFeedbackSection() {
                 initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                 style={{ overflow: 'hidden' }}
               >
-                <div style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {!ai.hasEnoughData ? (
-                    <p style={{ fontSize: 12, color: C.muted2 }}>Need at least 3 responses for an AI summary.</p>
+                    <div style={{ background: C.bgCream, padding: 16, borderRadius: 12, border: C.borderThin, fontWeight: 600, color: C.ink, fontSize: 13 }}>
+                      Need at least 3 responses to generate an AI summary. Keep sharing your link.
+                    </div>
                   ) : ai.summary ? (
-                    [
-                      { icon: '↑', label: 'Strength', text: ai.summary.strength, color: C.green },
-                      { icon: '↓', label: 'Weakness', text: ai.summary.weakness, color: C.coral },
-                      { icon: '→', label: 'Improve', text: ai.summary.tip, color: C.gold },
-                    ].map(item => (
-                      <div key={item.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                        <div style={{ width: 22, height: 22, borderRadius: 7, background: item.color + '15', border: `1px solid ${item.color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: item.color, flexShrink: 0 }}>
-                          {item.icon}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                      {[
+                        { icon: '↑', label: 'Perceived Strength', text: ai.summary.strength, bg: C.green },
+                        { icon: '↓', label: 'Perceived Weakness', text: ai.summary.weakness, bg: C.red },
+                        { icon: '→', label: 'How to Improve', text: ai.summary.tip, bg: C.yellow },
+                      ].map((item, i) => (
+                        <div key={item.label} style={{ background: C.white, border: C.borderThin, borderRadius: 14, padding: '16px', boxShadow: C.shadowSm }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: 8, background: item.bg, border: C.borderThin, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: C.ink, fontWeight: 900 }}>
+                              {item.icon}
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+                          </div>
+                          <h3 style={{ fontSize: 14, color: C.ink, lineHeight: 1.5, margin: 0, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{item.text}</h3>
                         </div>
-                        <div>
-                          <div style={{ fontSize: 9, fontWeight: 800, color: item.color, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>{item.label}</div>
-                          <p style={{ fontSize: 12, color: C.muted2, lineHeight: 1.6, margin: 0 }}>{item.text}</p>
-                        </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
-                    <p style={{ fontSize: 12, color: C.muted2 }}>Unable to generate summary at this time.</p>
+                    <div style={{ background: C.warm1, padding: 16, borderRadius: 12, border: C.borderThin, fontWeight: 600, color: C.ink, fontSize: 13 }}>
+                      Unable to generate summary at this time.
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -243,15 +275,17 @@ export default function RizzFeedbackSection() {
 
         {/* Anonymous Messages */}
         {data.messages.length > 0 && (
-          <div>
+          <div style={{ borderTop: C.borderThin, paddingTop: 24 }}>
             <button
               onClick={() => setShowMessages(v => !v)}
               style={{
-                background: 'none', border: 'none', padding: 0, fontSize: 11, fontWeight: 700,
-                color: C.muted2, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+                width: '100%', background: 'none', border: 'none', padding: 0, 
+                fontSize: 13, fontWeight: 900, color: C.ink, cursor: 'pointer', 
+                fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'space-between'
               }}
             >
-              {showMessages ? '▲ Hide' : '▼ Show'} {data.messages.length} anonymous message{data.messages.length !== 1 ? 's' : ''}
+              <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Anonymous Messages ({data.messages.length})</span>
+              <span>{showMessages ? '▲' : '▼'}</span>
             </button>
 
             <AnimatePresence>
@@ -260,12 +294,12 @@ export default function RizzFeedbackSection() {
                   initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
                     {data.messages.slice(0, 15).map((m, i) => (
                       <div key={i} style={{
-                        background: C.surfaceHi, border: `1px solid ${C.border}`, borderRadius: 10,
-                        padding: '10px 14px', fontSize: 12, color: C.muted2, lineHeight: 1.5,
-                        borderLeft: `2px solid ${C.violet}30`,
+                        background: C.bgCream, border: C.borderThin, borderRadius: 12,
+                        padding: '16px', fontSize: 14, color: C.ink, lineHeight: 1.5,
+                        fontWeight: 600, boxShadow: C.shadowSm,
                       }}>
                         "{m.message}"
                       </div>

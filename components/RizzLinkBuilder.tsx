@@ -7,15 +7,23 @@ import dynamic from 'next/dynamic';
 
 const RizzAvatarModule = dynamic(() => import('@/components/RizzAvatars').then(m => ({ default: m.RizzAvatar })), { ssr: false });
 
-// ─── Design ──────────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS — Neo-Brutalism ───────────────────────────────────────────
 const C = {
-  surface: 'rgba(255,255,255,0.03)', surfaceHi: 'rgba(255,255,255,0.06)',
-  border: 'rgba(255,255,255,0.07)', borderHi: 'rgba(255,255,255,0.13)',
-  text: '#F0EDE8', muted: 'rgba(240,237,232,0.3)', muted2: 'rgba(240,237,232,0.55)',
-  coral: '#FF5B3A', coralLo: 'rgba(255,91,58,0.1)',
-  violet: '#7B6CF6', violetLo: 'rgba(123,108,246,0.1)',
-  green: '#4DEBA1', greenLo: 'rgba(77,235,161,0.08)',
-  gold: '#F5C842', goldLo: 'rgba(245,200,66,0.08)',
+  cream:     '#F3EDE2',
+  ink:       '#0F0C09',
+  red:       '#D13920',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  warm1:     '#E8E0D2',
+  warm2:     '#D4CBBA',
+  muted:     '#8A8074',
+  shadow:    '4px 4px 0px #0F0C09',
+  shadowLg:  '8px 8px 0px #0F0C09',
+  shadowSm:  '2px 2px 0px #0F0C09',
+  border:    '3px solid #0F0C09',
+  borderThin:'2px solid #0F0C09',
 };
 
 const AVATARS = ['cat', 'dog', 'fox', 'robot', 'panda'] as const;
@@ -23,29 +31,23 @@ const AVATAR_LABELS: Record<string, string> = { cat:'Cat', dog:'Dog', fox:'Fox',
 
 const TRAITS = [
   { id: 'flirting',   label: 'Flirting Ability', emoji: '💬' },
-  { id: 'humor',      label: 'Humor',             emoji: '😄' },
-  { id: 'confidence', label: 'Confidence',        emoji: '💪' },
-  { id: 'dryText',    label: 'Dry Texting',       emoji: '🏜️' },
-  { id: 'overall',    label: 'Overall Rizz',      emoji: '⭐' },
+  { id: 'humor',      label: 'Humor',            emoji: '😄' },
+  { id: 'confidence', label: 'Confidence',       emoji: '💪' },
+  { id: 'dryText',    label: 'Dry Texting',      emoji: '🏜️' },
+  { id: 'overall',    label: 'Overall Rizz',     emoji: '⭐' },
 ];
 
 const THEMES = [
   {
-    id: 'minimal',
-    label: 'Minimal Dark',
-    desc: 'Black · White · Red',
+    id: 'minimal', label: 'Minimal Dark', desc: 'Black · White · Red',
     preview: { bg: '#08080F', accent: '#FF3B1F', text: '#F0EDE8', font: 'sans-serif' },
   },
   {
-    id: 'vintage',
-    label: '90s Vintage Web',
-    desc: 'Dark Purple · Neon Pink · Orbitron',
+    id: 'vintage', label: '90s Vintage Web', desc: 'Dark Purple · Neon Pink',
     preview: { bg: '#0A0018', accent: '#FF005C', text: '#F0E0FF', font: 'monospace' },
   },
   {
-    id: 'gothic',
-    label: 'Gothic',
-    desc: 'Black · Crimson · Cinzel Serif',
+    id: 'gothic', label: 'Gothic', desc: 'Black · Crimson · Serif',
     preview: { bg: '#060608', accent: '#C8001E', text: '#EDE8E0', font: 'Georgia, serif' },
   },
 ];
@@ -65,22 +67,22 @@ const DEFAULT_CONFIG: RizzPageConfig = {
   allowMessage: true, customQuestion: '', showFinalCTA: true,
 };
 
-// ─── Toggle ───────────────────────────────────────────────────────────────────
+// ─── Brutalist Toggle ─────────────────────────────────────────────────────────
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <motion.button
       onClick={() => onChange(!on)}
-      animate={{ background: on ? C.coral : C.surfaceHi }}
+      animate={{ background: on ? C.green : C.warm2 }}
       transition={{ duration: 0.2 }}
       style={{
-        width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
-        position: 'relative', flexShrink: 0,
+        width: 48, height: 26, borderRadius: 13, border: C.borderThin, cursor: 'pointer',
+        position: 'relative', flexShrink: 0, boxShadow: C.shadowSm, padding: 0
       }}
     >
       <motion.div
-        animate={{ x: on ? 18 : 2 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-        style={{ width: 14, height: 14, borderRadius: '50%', background: 'white', position: 'absolute', top: 3 }}
+        animate={{ x: on ? 22 : 2 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        style={{ width: 18, height: 18, borderRadius: '50%', background: C.white, border: C.borderThin, position: 'absolute', top: 2 }}
       />
     </motion.button>
   );
@@ -124,65 +126,70 @@ export default function RizzLinkBuilder({ username }: { username?: string | null
   };
 
   if (loading) {
-    return <div style={{ padding: '24px', color: C.muted, fontSize: 13, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18 }}>Loading builder...</div>;
+    return <div style={{ padding: '24px', color: C.ink, fontSize: 15, fontWeight: 800, background: C.warm1, border: C.border, borderRadius: 20, boxShadow: C.shadow }}>Loading builder...</div>;
   }
 
   const rizzLink = username ? `${typeof window !== 'undefined' ? window.location.origin : ''}/u/${username}` : null;
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, overflow: 'hidden' }}>
+    <div style={{ background: C.white, border: C.border, borderRadius: 24, overflow: 'hidden', boxShadow: C.shadow }}>
       {/* Header */}
-      <div style={{ padding: '20px 22px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '24px', borderBottom: C.borderThin, background: C.bgCream, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={{ fontSize: 9, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 800, marginBottom: 3 }}>Rizz Link Builder</div>
+          <div style={{ fontSize: 11, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, background: C.yellow, borderRadius: '50%', border: '1px solid #000' }} />
+            Page Builder
+          </div>
           {username ? (
             <Link href={`/u/${username}`} target="_blank" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: C.coral, fontFamily: 'monospace' }}>
-                /u/{username} ↗
+              <span style={{ fontSize: 15, fontWeight: 900, color: C.blue, fontFamily: "'DM Sans',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}>
+                /u/{username} <span style={{ fontSize: 12 }}>↗</span>
               </span>
             </Link>
           ) : (
-            <span style={{ fontSize: 12, color: C.muted2 }}>Set a username to activate your link</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.red }}>Set a username above to activate link</span>
           )}
         </div>
         <motion.button
-          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+          whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
           onClick={save} disabled={saving || !username}
           style={{
-            background: saved ? C.green + '20' : C.coral, color: saved ? C.green : '#fff',
-            border: saved ? `1px solid ${C.green}30` : 'none',
-            borderRadius: 10, padding: '8px 18px', fontSize: 12, fontWeight: 800,
-            cursor: (!username || saving) ? 'not-allowed' : 'pointer',
-            fontFamily: "'DM Sans', sans-serif",
-            opacity: !username ? 0.5 : 1,
+            background: saved ? C.green : C.ink, color: C.white,
+            border: C.borderThin, borderRadius: 12, padding: '10px 24px', 
+            fontSize: 14, fontWeight: 900, cursor: (!username || saving) ? 'not-allowed' : 'pointer',
+            fontFamily: "'DM Sans', sans-serif", opacity: !username ? 0.5 : 1,
+            boxShadow: C.shadowSm,
           }}
         >
-          {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save'}
+          {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Changes'}
         </motion.button>
       </div>
 
-      <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 40 }}>
 
         {/* ── Theme Picker ─────────────────────────────────────────────── */}
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>Theme</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Theme</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             {THEMES.map(t => {
               const active = config.theme === t.id;
               return (
                 <motion.button key={t.id}
-                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                  whileHover={{ y: -2, boxShadow: C.shadowSm }} whileTap={{ y: 0, boxShadow: 'none' }}
                   onClick={() => set('theme', t.id as RizzPageConfig['theme'])}
                   style={{
-                    background: t.preview.bg, border: `2px solid ${active ? C.coral : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: 12, padding: '12px 8px', cursor: 'pointer', textAlign: 'center',
-                    transition: 'border-color 0.2s',
+                    background: active ? C.yellow : C.white, border: C.borderThin,
+                    borderRadius: 16, padding: '16px', cursor: 'pointer', textAlign: 'center',
+                    transition: 'background 0.2s', boxShadow: active ? C.shadowSm : 'none',
                   }}
                 >
-                  {/* Mini preview bar */}
-                  <div style={{ width: 24, height: 4, background: t.preview.accent, borderRadius: 2, margin: '0 auto 6px', boxShadow: t.id === 'vintage' ? `0 0 6px ${t.preview.accent}` : undefined }} />
-                  <div style={{ fontSize: 11, fontWeight: 700, color: t.preview.text, fontFamily: t.preview.font, marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{t.desc}</div>
+                  {/* Mini preview bar simulating the page */}
+                  <div style={{ background: t.preview.bg, border: C.borderThin, borderRadius: 8, padding: '12px 8px', marginBottom: 12 }}>
+                    <div style={{ width: 32, height: 6, background: t.preview.accent, borderRadius: 3, margin: '0 auto 8px' }} />
+                    <div style={{ fontSize: 12, fontWeight: 900, color: t.preview.text, fontFamily: t.preview.font, lineHeight: 1 }}>{t.label}</div>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: C.ink, fontFamily: "'DM Sans', sans-serif" }}>{t.label}</div>
+                  <div style={{ fontSize: 10, color: '#555', fontWeight: 600, marginTop: 4 }}>{t.desc}</div>
                 </motion.button>
               );
             })}
@@ -191,83 +198,91 @@ export default function RizzLinkBuilder({ username }: { username?: string | null
 
         {/* ── Avatar Picker ─────────────────────────────────────────────── */}
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>Avatar</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Your Avatar</div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {AVATARS.map(av => {
               const active = config.avatar === av;
               return (
                 <motion.button key={av}
-                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
+                  whileHover={{ y: -2 }} whileTap={{ y: 1 }}
                   onClick={() => set('avatar', av)}
                   title={AVATAR_LABELS[av]}
                   style={{
-                    background: active ? C.coralLo : C.surfaceHi,
-                    border: `2px solid ${active ? C.coral : C.border}`,
-                    borderRadius: 14, padding: '8px', cursor: 'pointer',
-                    transition: 'border-color 0.2s',
+                    background: active ? C.blue : C.warm1,
+                    border: C.borderThin, borderRadius: 16, padding: '12px', cursor: 'pointer',
+                    boxShadow: active ? C.shadowSm : 'none', transition: 'background 0.2s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center'
                   }}
                 >
-                  <RizzAvatarModule type={av} size={44} />
-                  <div style={{ fontSize: 9, color: active ? C.coral : C.muted, fontWeight: 700, marginTop: 4 }}>{AVATAR_LABELS[av]}</div>
+                  <div style={{ background: C.white, borderRadius: 10, padding: 8, border: C.borderThin }}>
+                    <RizzAvatarModule type={av} size={48} />
+                  </div>
+                  <div style={{ fontSize: 11, color: active ? C.white : C.ink, fontWeight: 900, marginTop: 8, fontFamily: "'DM Sans', sans-serif" }}>
+                    {AVATAR_LABELS[av]}
+                  </div>
                 </motion.button>
               );
             })}
           </div>
         </div>
 
-        {/* ── Trait Toggles ─────────────────────────────────────────────── */}
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>Enabled Traits</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {TRAITS.map(t => {
-              const on = config.enabledTraits.includes(t.id);
-              return (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 13, color: on ? C.text : C.muted, fontWeight: 500, transition: 'color 0.2s' }}>
-                    {t.emoji} {t.label}
-                  </span>
-                  <Toggle on={on} onChange={() => toggleTrait(t.id)} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Page Options ──────────────────────────────────────────────── */}
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12 }}>Page Options</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: C.muted2, fontWeight: 500 }}>💬 Allow anonymous message</span>
-              <Toggle on={config.allowMessage} onChange={v => set('allowMessage', v)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, color: C.muted2, fontWeight: 500 }}>🔗 Show viral CTA after submit</span>
-              <Toggle on={config.showFinalCTA} onChange={v => set('showFinalCTA', v)} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 32 }}>
+          {/* ── Trait Toggles ─────────────────────────────────────────────── */}
+          <div style={{ background: C.bgCream, border: C.borderThin, padding: '24px', borderRadius: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 20 }}>Public Traits</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {TRAITS.map(t => {
+                const on = config.enabledTraits.includes(t.id);
+                return (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.white, border: C.borderThin, padding: '12px 16px', borderRadius: 12, boxShadow: C.shadowSm }}>
+                    <span style={{ fontSize: 14, color: C.ink, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>
+                      <span style={{ marginRight: 8 }}>{t.emoji}</span> {t.label}
+                    </span>
+                    <Toggle on={on} onChange={() => toggleTrait(t.id)} />
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
 
-        {/* ── Custom Question ────────────────────────────────────────────── */}
-        {config.allowMessage && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>Custom Message Prompt</div>
-            <input
-              type="text"
-              value={config.customQuestion}
-              onChange={e => set('customQuestion', e.target.value.slice(0, 200))}
-              placeholder="e.g. What's one thing I could improve?"
-              style={{
-                width: '100%', background: C.surfaceHi, border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: '11px 14px', fontSize: 13, color: C.text,
-                outline: 'none', fontFamily: "'DM Sans', sans-serif",
-              }}
-              onFocus={e => e.target.style.borderColor = C.borderHi}
-              onBlur={e => e.target.style.borderColor = C.border}
-            />
-            <div style={{ fontSize: 10, color: C.muted, marginTop: 4, textAlign: 'right' }}>{config.customQuestion.length}/200</div>
+          {/* ── Page Options ──────────────────────────────────────────────── */}
+          <div style={{ background: C.bgCream, border: C.borderThin, padding: '24px', borderRadius: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 20 }}>Interactions</div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.white, border: C.borderThin, padding: '12px 16px', borderRadius: 12, boxShadow: C.shadowSm }}>
+                <span style={{ fontSize: 14, color: C.ink, fontWeight: 800 }}>💬 Allow anonymous messages</span>
+                <Toggle on={config.allowMessage} onChange={v => set('allowMessage', v)} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.white, border: C.borderThin, padding: '12px 16px', borderRadius: 12, boxShadow: C.shadowSm }}>
+                <span style={{ fontSize: 14, color: C.ink, fontWeight: 800 }}>🔗 Show referral CTA link</span>
+                <Toggle on={config.showFinalCTA} onChange={v => set('showFinalCTA', v)} />
+              </div>
+            </div>
+
+            {/* Custom Question */}
+            <AnimatePresence>
+              {config.allowMessage && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>Message Box Prompt</div>
+                  <input
+                    type="text"
+                    value={config.customQuestion}
+                    onChange={e => set('customQuestion', e.target.value.slice(0, 100))}
+                    placeholder="e.g. Rate my rizz out of 10..."
+                    style={{
+                      width: '100%', background: C.white, border: C.borderThin,
+                      borderRadius: 12, padding: '14px', fontSize: 14, fontWeight: 700,
+                      color: C.ink, outline: 'none', fontFamily: "'DM Sans', sans-serif",
+                      boxShadow: 'inset 2px 2px 0px rgba(0,0,0,0.05)',
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: '#666', marginTop: 8, textAlign: 'right', fontWeight: 700 }}>{config.customQuestion.length}/100</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -4,10 +4,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
+// ─── DESIGN TOKENS — Neo-Brutalism (ZERO TRANSPARENCY) ───────────────────────
 const C = {
-  cream: '#F3EDE2', ink: '#0F0C09', red: '#D13920',
-  warm1: '#E8E0D2', warm2: '#D4CBBA', muted: '#8A8074', mutedLt: '#BFB8AC',
-  green: '#2D8A4E', amber: '#B87A10',
+  cream:     '#F3EDE2',
+  ink:       '#0F0C09',
+  red:       '#D13920',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  white:     '#FFFFFF',
+  shadow:    '4px 4px 0px #0F0C09',
+  shadowLg:  '8px 8px 0px #0F0C09',
+  shadowSm:  '2px 2px 0px #0F0C09',
+  border:    '3px solid #0F0C09',
+  borderThin:'2px solid #0F0C09',
 };
 
 const PREMIUM_BENEFITS = [
@@ -55,26 +66,25 @@ export default function PremiumModal({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
+          {/* SOLID BACKDROP - No transparency, no blur */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.15 }}
             onClick={onClose}
             style={{
               position: 'fixed', inset: 0, zIndex: 9998,
-              background: 'rgba(15,12,9,0.55)',
-              backdropFilter: 'blur(8px)',
+              background: C.ink,
             }}
           />
 
-          {/* Modal */}
+          {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 28 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 16 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             style={{
               position: 'fixed', inset: 0, zIndex: 9999,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -84,133 +94,141 @@ export default function PremiumModal({
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: C.cream, borderRadius: 24,
+                background: C.white, borderRadius: 24,
                 padding: 'clamp(28px, 5vw, 40px)',
-                maxWidth: 440, width: '100%',
-                boxShadow: '0 24px 80px rgba(15,12,9,0.3), 0 2px 8px rgba(15,12,9,0.1)',
-                border: `1.5px solid ${C.warm2}`,
+                maxWidth: 460, width: '100%',
+                border: C.border,
+                boxShadow: `12px 12px 0px ${C.yellow}`, // Hard offset shadow
                 pointerEvents: 'auto', position: 'relative',
                 maxHeight: '90vh', overflowY: 'auto',
               }}
             >
-              {/* Close button */}
-              <button
+              {/* Brutalist Close Button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                 onClick={onClose}
                 style={{
-                  position: 'absolute', top: 16, right: 16,
-                  width: 32, height: 32, borderRadius: 8,
-                  background: C.warm1, border: `1px solid ${C.warm2}`,
+                  position: 'absolute', top: 20, right: 20,
+                  width: 36, height: 36, borderRadius: 10,
+                  background: C.cream, border: C.borderThin,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: C.muted, fontSize: 16,
+                  cursor: 'pointer', color: C.ink, fontSize: 18, fontWeight: 900,
+                  boxShadow: C.shadowSm,
                 }}
               >
                 ✕
-              </button>
+              </motion.button>
 
-              {/* Lock icon */}
+              {/* Icon Block */}
               <div style={{
-                width: 52, height: 52, borderRadius: 16,
-                background: `${C.red}10`, border: `1.5px solid ${C.red}30`,
+                width: 56, height: 56, borderRadius: 16,
+                background: type === 'signup' ? C.yellow : C.blue, 
+                border: C.borderThin,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 24, marginBottom: 20,
+                fontSize: 28, marginBottom: 24, boxShadow: C.shadowSm,
               }}>
                 {type === 'signup' ? '✨' : '🔓'}
               </div>
 
               {/* Heading */}
               <h2 style={{
-                fontFamily: "'Bricolage Grotesque', sans-serif",
-                fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 900,
-                color: C.ink, letterSpacing: '-0.02em', lineHeight: 1.1,
-                margin: '0 0 8px',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 'clamp(28px, 6vw, 36px)', fontWeight: 900,
+                color: C.ink, letterSpacing: '-0.03em', lineHeight: 1.1,
+                margin: '0 0 12px',
               }}>
                 {heading}
               </h2>
               <p style={{
-                fontSize: 14, color: C.muted, lineHeight: 1.65,
-                margin: '0 0 24px', fontFamily: "'DM Sans', sans-serif",
+                fontSize: 15, color: '#444', lineHeight: 1.6,
+                margin: '0 0 28px', fontFamily: "'DM Sans', sans-serif", fontWeight: 700,
               }}>
                 {sub}
               </p>
 
-              {/* Benefits list */}
+              {/* Benefits List */}
               {type === 'upgrade' && (
                 <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 10,
-                  marginBottom: 24, paddingTop: 16,
-                  borderTop: `1px solid ${C.warm2}`,
+                  background: C.cream, border: C.borderThin, borderRadius: 16,
+                  padding: '20px', display: 'flex', flexDirection: 'column', gap: 14,
+                  marginBottom: 28, boxShadow: 'inset 3px 3px 0px rgba(0,0,0,0.05)'
                 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Premium Includes</div>
                   {PREMIUM_BENEFITS.map(({ emoji, text }) => (
                     <div key={text} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      fontSize: 13.5, color: C.ink, fontFamily: "'DM Sans', sans-serif",
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      fontSize: 14, color: C.ink, fontFamily: "'DM Sans', sans-serif", fontWeight: 800
                     }}>
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>{emoji}</span>
+                      <div style={{ width: 28, height: 28, background: C.white, border: C.borderThin, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, boxShadow: C.shadowSm }}>
+                        {emoji}
+                      </div>
                       {text}
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* ─── 3 Action Options ─── */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* ─── Action Options ─── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                
                 {/* Option 1: Upgrade to Premium */}
-                <Link href="/upgrade" style={{ textDecoration: 'none' }}>
-                  <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: '0 8px 32px rgba(209,57,32,0.3)' }}
-                    whileTap={{ scale: 0.97 }}
-                    style={{
-                      width: '100%', padding: '15px 24px',
-                      borderRadius: 14, border: 'none',
-                      background: C.red, color: '#fff',
-                      fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                      fontFamily: "'Bricolage Grotesque', sans-serif",
-                      display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', gap: 10,
-                      boxShadow: '0 4px 20px rgba(209,57,32,0.25)',
-                    }}
-                  >
-                    🚀 Upgrade to Premium
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M2 8h12M8.5 3.5l4.5 4.5-4.5 4.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </motion.button>
-                </Link>
+                {type === 'upgrade' && (
+                  <Link href="/upgrade" style={{ textDecoration: 'none' }}>
+                    <motion.button
+                      whileHover={{ y: -2, boxShadow: C.shadowSm }}
+                      whileTap={{ y: 0, boxShadow: 'none' }}
+                      style={{
+                        width: '100%', padding: '16px 24px',
+                        borderRadius: 14, border: C.borderThin,
+                        background: C.red, color: C.white,
+                        fontSize: 16, fontWeight: 900, cursor: 'pointer',
+                        fontFamily: "'DM Sans', sans-serif",
+                        display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: 10,
+                        boxShadow: C.shadowSm,
+                      }}
+                    >
+                      🚀 Upgrade to Premium
+                    </motion.button>
+                  </Link>
+                )}
 
                 {/* Option 2: Watch Ad for free unlock */}
                 {onWatchAd && (
                   <motion.button
                     onClick={() => { onClose(); onWatchAd(); }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ y: -2, boxShadow: C.shadowSm }}
+                    whileTap={{ y: 0, boxShadow: 'none' }}
                     style={{
-                      width: '100%', padding: '15px 24px',
-                      borderRadius: 14, border: `1.5px solid ${C.warm2}`,
-                      background: C.warm1, color: C.ink,
-                      fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                      width: '100%', padding: '16px 24px',
+                      borderRadius: 14, border: C.borderThin,
+                      background: C.yellow, color: C.ink,
+                      fontSize: 15, fontWeight: 900, cursor: 'pointer',
                       fontFamily: "'DM Sans', sans-serif",
                       display: 'flex', alignItems: 'center',
                       justifyContent: 'center', gap: 10,
+                      boxShadow: C.shadowSm,
                     }}
                   >
-                    🎬 Watch Ad → Unlock 1 More Analysis
+                    🎬 Watch Ad → Unlock 1 More
                   </motion.button>
                 )}
 
                 {/* Option 3: Create Account (for anonymous users) */}
                 {type === 'signup' && (
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
                     onClick={() => signIn('google')}
+                    whileHover={{ y: -2, boxShadow: C.shadowSm }}
+                    whileTap={{ y: 0, boxShadow: 'none' }}
                     style={{
-                      width: '100%', padding: '15px 24px',
-                      borderRadius: 14, border: 'none',
-                      background: C.ink, color: C.cream,
-                      fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                      fontFamily: "'Bricolage Grotesque', sans-serif",
+                      width: '100%', padding: '16px 24px',
+                      borderRadius: 14, border: C.borderThin,
+                      background: C.ink, color: C.white,
+                      fontSize: 16, fontWeight: 900, cursor: 'pointer',
+                      fontFamily: "'DM Sans', sans-serif",
                       display: 'flex', alignItems: 'center',
                       justifyContent: 'center', gap: 10,
+                      boxShadow: C.shadowSm,
                     }}
                   >
                     ✨ Create Free Account
@@ -220,11 +238,12 @@ export default function PremiumModal({
 
               {/* Fine print */}
               <p style={{
-                textAlign: 'center', marginTop: 14,
-                fontSize: 11, color: C.mutedLt,
+                textAlign: 'center', marginTop: 24,
+                fontSize: 11, color: '#555', fontWeight: 800,
                 fontFamily: "'DM Sans', sans-serif",
+                textTransform: 'uppercase', letterSpacing: '0.05em'
               }}>
-                Cancel anytime · No screenshots stored · Your chats are never saved
+                Cancel anytime · No screenshots stored
               </p>
             </div>
           </motion.div>

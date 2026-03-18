@@ -1,5 +1,3 @@
-// app/results/page.tsx — REPLACE your entire existing file
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -170,25 +168,7 @@ export default function ResultsPage() {
           </div>
         </motion.div>
 
-        {/* Roast */}
-        <AnimatePresence>
-          {results.roastMode && results.roastText && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-5 rounded-3xl p-6 border border-orange-500/20"
-              style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(245,158,11,0.06))' }}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-2xl">🔥</span>
-                <span className="text-orange-300 font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>The Roast</span>
-              </div>
-              <p className="text-orange-100 leading-relaxed italic text-sm">&ldquo;{results.roastText}&rdquo;</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Tabs */}
+        {/* Tabs (MOVED TO TOP) */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -203,7 +183,7 @@ export default function ResultsPage() {
                 tab === t ? 'bg-[var(--electric)] text-white' : 'text-[var(--text-muted)] hover:text-white'
               }`}
             >
-              {t === 'scores' ? '📊 Scores' : t === 'feedback' ? '💡 Feedback' : '🎯 Next Moves'}
+              {t === 'scores' ? '📊 Analysis' : t === 'feedback' ? '💡 Feedback' : '🎯 Next Moves'}
             </button>
           ))}
         </motion.div>
@@ -212,6 +192,21 @@ export default function ResultsPage() {
           {/* SCORES TAB */}
           {tab === 'scores' && (
             <motion.div key="scores" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              
+              {/* Roast (MOVED INSIDE TAB SO IT DOESN'T PUSH TABS DOWN) */}
+              {results.roastMode && results.roastText && (
+                <div
+                  className="mb-5 rounded-3xl p-6 border border-orange-500/20"
+                  style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(245,158,11,0.06))' }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-2xl">🔥</span>
+                    <span className="text-orange-300 font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>The Roast</span>
+                  </div>
+                  <p className="text-orange-100 leading-relaxed italic text-sm">&ldquo;{results.roastText}&rdquo;</p>
+                </div>
+              )}
+
               <div className="glass rounded-3xl p-6 border border-[var(--border-subtle)] space-y-5">
                 <BarScore label="😂 Humor" value={results.humorScore} color="linear-gradient(90deg, #f59e0b, #fcd34d)" />
                 <BarScore label="💪 Confidence" value={results.confidenceScore} color="linear-gradient(90deg, #8b5cf6, #a78bfa)" />

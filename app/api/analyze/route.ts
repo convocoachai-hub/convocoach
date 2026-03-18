@@ -14,9 +14,6 @@ const ANON_COOKIE = 'cc_a1';
 const FREE_MAX    = 5;  // signed-in free users get 5 analyses
 
 // ─── CRITICAL: Sanitize control characters inside JSON strings ────────────────
-// The AI sometimes returns JSON with literal newlines/tabs inside string values
-// which makes JSON.parse throw "Bad control character in string literal".
-// This walks the string char-by-char and escapes control chars only inside strings.
 function sanitizeJSON(str: string): string {
   let result = '';
   let inString = false;
@@ -64,26 +61,21 @@ function sanitizeJSON(str: string): string {
 
 // ─── Robust JSON extraction + parse ──────────────────────────────────────────
 function parseAIResponse(raw: string): Record<string, unknown> | null {
-  // 1. Strip markdown code fences
   let cleaned = raw
     .replace(/^```(?:json)?\s*/im, '')
     .replace(/\s*```\s*$/m, '')
     .trim();
 
-  // 2. Extract the outermost JSON object
   const start = cleaned.indexOf('{');
   const end   = cleaned.lastIndexOf('}');
   if (start === -1 || end === -1) return null;
 
   let jsonStr = cleaned.slice(start, end + 1);
-
-  // 3. Sanitize control characters inside string values
   jsonStr = sanitizeJSON(jsonStr);
 
   try {
     return JSON.parse(jsonStr);
   } catch (firstErr) {
-    // 4. Last resort: strip remaining control chars outside strings
     try {
       const fallback = jsonStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
       return JSON.parse(fallback);
@@ -128,14 +120,12 @@ const LANGUAGE_HINTS: Record<string, string> = {
 function speakerHint(side: string): string {
   if (side === 'right') return `
 SPEAKER IDENTIFICATION — USER CONFIRMED:
-The person who wants this analysis has confirmed their messages are on the RIGHT side (blue/filled bubbles).
 - RIGHT side bubbles = USER (label as "User" in extractedText)
 - LEFT side bubbles  = THE OTHER PERSON (label as "Them" in extractedText)
 This is 100% confirmed. Do NOT mix them up.`;
 
   if (side === 'left') return `
 SPEAKER IDENTIFICATION — USER CONFIRMED:
-The person who wants this analysis has confirmed their messages are on the LEFT side.
 - LEFT side bubbles  = USER (label as "User" in extractedText)
 - RIGHT side bubbles = THE OTHER PERSON (label as "Them" in extractedText)
 This is 100% confirmed. Do NOT mix them up.`;
@@ -143,64 +133,59 @@ This is 100% confirmed. Do NOT mix them up.`;
   return `
 SPEAKER IDENTIFICATION — AUTO-DETECT:
 Determine who is the "User" vs "Them" from visual cues:
-- Blue/filled/right-aligned bubbles are almost always the User in WhatsApp, iMessage, Instagram, Tinder
-- "Delivered" / "Read" / checkmarks appear under the User's own messages
-- The other person's name/avatar appears at the top of the screen or next to their bubbles
+- Blue/filled/right-aligned bubbles are almost always the User.
 Make a definitive call and record it in "whoIsUser".`;
 }
 
 // ─── Build prompt ─────────────────────────────────────────────────────────────
-function buildPrompt(context: string, language: string, roastMode: boolean, userSide: string): string {
+function buildPrompt(context: string, language: string, roastMode: boolean, userSide: string, imageCount: number): string {
   const ctxNote  = CONTEXT_PROMPTS[context]  ?? CONTEXT_PROMPTS.dating;
   const langNote = LANGUAGE_HINTS[language]  ?? LANGUAGE_HINTS.auto;
   const sideNote = speakerHint(userSide);
 
-  return `You are an elite conversation analyst combining expertise in behavioral psychology, attachment theory, and communication dynamics. Produce a premium-quality 10-layer deep analysis that would genuinely change how someone understands their conversations.
+  const multiImageRules = imageCount > 1 ? `
+━━━ MULTIPLE SCREENSHOTS DETECTED (${imageCount}) ━━━
+You have been provided with ${imageCount} screenshots representing ONE continuous conversation. 
+1. Read them in chronological order.
+2. OVERLAPS: Screenshots often overlap. If you see the exact same messages at the bottom of one image and the top of the next, DO NOT duplicate them.
+3. Treat the entire sequence as a single unified timeline.
+` : '';
+
+  return `You are an elite conversation analyst combining expertise in behavioral psychology, attachment theory, and communication dynamics. Produce a premium-quality 10-layer deep analysis.
 
 CRITICAL QUALITY STANDARDS:
-- ALWAYS cite specific messages from the conversation as evidence. Never make claims without pointing to what was actually said.
-- Be brutally specific. Instead of "they seem interested", say exactly WHICH messages show interest and WHY those specific words/patterns indicate it.
-- Detect subtle signals most people miss: response timing patterns, question types (open vs closed), emotional investment asymmetry, mirroring language, topic escalation/de-escalation.
-- For mistakes and missed opportunities, explain the PSYCHOLOGICAL mechanism — WHY does double-texting reduce perceived value? WHY does matching their energy level matter?
-- Write rewrites that are genuinely better — not just different. Each rewrite should demonstrate a specific communication principle.
-- Strategy advice must be immediately actionable and specific to THIS conversation, not generic dating tips.
+- ALWAYS cite specific messages from the conversation as evidence.
+- Detect subtle signals most people miss: response timing, question types, emotional investment asymmetry, topic escalation.
+- For mistakes/missed opportunities, explain the PSYCHOLOGICAL mechanism.
+- Strategy advice must be immediately actionable for THIS specific conversation.
 
 LANGUAGE: ${langNote}
 CONTEXT: ${ctxNote}
-${roastMode ? 'ROAST MODE ENABLED: Be brutally honest and darkly funny. Reference specific real messages by quoting them. Your roast must be so specific that it could only apply to THIS conversation. End with one genuinely actionable tip despite the roast.' : ''}
+${roastMode ? 'ROAST MODE ENABLED: Be brutally honest and darkly funny. Reference specific real messages by quoting them. Your roast must be so specific that it could only apply to THIS conversation.' : ''}
 
 ${sideNote}
+${multiImageRules}
 
 ━━━ WHAT TO COMPLETELY IGNORE ━━━
-Never analyze or quote any of these UI elements — they are noise:
-• Timestamps and date separators (e.g. "Today 2:34 PM", "Yesterday", "Monday")
-• Read receipts and delivery status ("Delivered", "Seen", "✓✓", "Read")
-• App notification banners
-• Status bar content (signal bars, battery, clock)
-• Profile pictures, avatars, contact names at screen top
-• "typing..." or "online" indicators
-• Reaction emoji overlays on messages
-• Message status icons (single/double ticks)
-• App navigation chrome (back buttons, menu icons, etc.)
+Never analyze or extract timestamps, battery icons, network bars, read receipts, or typing indicators.
 
 ━━━ EXTRACT ONLY ━━━
-• The actual text content from message bubbles
-• Who sent each message (User vs Them)
+• The actual text content from message bubbles (combine them seamlessly across screenshots if there are overlaps).
+• Who sent each message (User vs Them).
 
 ━━━ IMPORTANT JSON RULES ━━━
 - Return ONLY a valid JSON object. No markdown, no backticks, no explanation outside JSON.
 - All string values must use proper JSON escaping: use \\n for newlines, \\t for tabs, \\" for quotes INSIDE strings.
-- Do NOT include literal newline characters inside JSON string values.
 
 {
-  "extractedText": "Full transcript. Use literal \\n to separate messages, like: User: hey\\nThem: hi\\nUser: how are you. Include ALL messages in order. Never include timestamps or read receipts.",
-  "detectedLanguage": "<ISO 639-1 code, e.g. en>",
-  "whoIsUser": "<which side you identified as the user, e.g. 'right-aligned blue bubbles'>",
+  "extractedText": "Full transcript. Use literal \\n to separate messages, like: User: hey\\nThem: hi. Include ALL messages in order. Never include timestamps.",
+  "detectedLanguage": "<ISO code>",
+  "whoIsUser": "<which side you identified as the user>",
 
   "layer1_diagnosis": {
-    "summary": "<3-5 sentence diagnosis: emotional tone, who is investing more, current stage, where it's headed if nothing changes.>",
+    "summary": "<3-5 sentence diagnosis: emotional tone, who is investing more, current stage>",
     "stage": "<one of: early_interest | flirting | escalating | neutral | fading | reconnecting | professional | platonic>",
-    "verdict": "<one punchy sentence verdict on overall conversation quality>"
+    "verdict": "<one punchy sentence verdict>"
   },
 
   "layer2_scores": {
@@ -216,9 +201,9 @@ Never analyze or quote any of these UI elements — they are noise:
 
   "layer3_psychSignals": [
     {
-      "signal": "<signal name, e.g. 'Mirroring', 'Anxiety Texting', 'Breadcrumbing'>",
+      "signal": "<signal name, e.g. 'Mirroring', 'Breadcrumbing'>",
       "detected": <true|false>,
-      "evidence": "<exact quote or close paraphrase from the conversation — NOT a timestamp>",
+      "evidence": "<exact quote from the conversation>",
       "meaning": "<what this reveals about the dynamic, 2 sentences>"
     }
   ],
@@ -227,14 +212,14 @@ Never analyze or quote any of these UI elements — they are noise:
     "whoHoldsPower": "<'user' | 'them' | 'balanced'>",
     "whoIsChasing": "<'user' | 'them' | 'neither'>",
     "whoIsLeading": "<'user' | 'them' | 'switching'>",
-    "analysis": "<3-4 sentences explaining the power balance and what creates it.>",
+    "analysis": "<3-4 sentences explaining the power balance.>",
     "rebalanceTip": "<One specific actionable thing the user can do right now to shift the balance>"
   },
 
   "layer5_mistakes": [
     {
       "mistake": "<short mistake title>",
-      "whatHappened": "<what the user actually said or did, quoted if possible>",
+      "whatHappened": "<what the user actually said or did>",
       "whyItHurts": "<psychological reason why this weakens attraction or rapport>",
       "severity": "<'low' | 'medium' | 'high'>"
     }
@@ -242,25 +227,25 @@ Never analyze or quote any of these UI elements — they are noise:
 
   "layer6_missedOpportunities": [
     {
-      "moment": "<what was actually said at this moment — must be a real message, not a timestamp>",
+      "moment": "<what was actually said at this moment>",
       "whatWasMissed": "<the opportunity that existed at that moment>",
-      "betterResponse": "<concrete, specific better reply that would have worked>"
+      "betterResponse": "<concrete, specific better reply>"
     }
   ],
 
   "layer7_rewrites": {
-    "originalMessage": "<the user's most recent OR weakest message — quote it exactly>",
-    "playful":   { "message": "<rewritten playful version>",   "why": "<why this version works better, 1-2 sentences>" },
-    "confident": { "message": "<rewritten confident version>", "why": "<why this version works better, 1-2 sentences>" },
-    "curious":   { "message": "<rewritten curious version>",   "why": "<why this version works better, 1-2 sentences>" }
+    "originalMessage": "<the user's most recent OR weakest message>",
+    "playful":   { "message": "<rewritten playful version>",   "why": "<why this works better>" },
+    "confident": { "message": "<rewritten confident version>", "why": "<why this works better>" },
+    "curious":   { "message": "<rewritten curious version>",   "why": "<why this works better>" }
   },
 
   "layer8_attractionSignals": [
     {
       "signal": "<signal name>",
       "type": "<'positive' | 'negative' | 'neutral'>",
-      "evidence": "<where in the conversation this appeared — a real message snippet>",
-      "interpretation": "<what this means for the interaction, 1-2 sentences>"
+      "evidence": "<quote from chat>",
+      "interpretation": "<what this means>"
     }
   ],
 
@@ -271,41 +256,38 @@ Never analyze or quote any of these UI elements — they are noise:
   },
 
   "layer10_strategy": {
-    "primaryAdvice": "<2-3 sentences of the single most important strategic advice for THIS specific conversation>",
-    "doThis":        "<single most important action to take next>",
-    "avoidThis":     "<single most important thing to avoid doing>",
+    "primaryAdvice": "<2-3 sentences of strategic advice>",
+    "doThis":        "<action to take next>",
+    "avoidThis":     "<thing to avoid>",
     "urgency":       "<one of: push_forward | slow_down | flirt_more | change_topic | disengage | maintain>",
-    "longTermRead":  "<honest assessment of whether this connection has real potential>"
+    "longTermRead":  "<honest assessment of potential>"
   },
 
   "conversationPersonalityType": {
     "type": "<one of: 'Playful' | 'Logical' | 'Flirty' | 'Awkward' | 'Dry' | 'Interview-style'>",
-    "description": "<1-2 sentences explaining WHY the user's texting style falls into this category, citing specific examples>",
-    "emoji": "<single emoji that represents this style>"
+    "description": "<1-2 sentences explaining WHY>",
+    "emoji": "<single emoji>"
   },
 
   "redFlags": [
     {
-      "pattern": "<name of the red flag pattern, e.g. 'Breadcrumbing', 'Ghosting Signals', 'Love Bombing', 'Mixed Signals', 'Low Investment'>",
-      "evidence": "<exact quote or specific behavior from the conversation that shows this pattern>",
+      "pattern": "<name of red flag>",
+      "evidence": "<exact quote>",
       "severity": "<'low' | 'medium' | 'high'>",
-      "advice": "<1-2 sentences of actionable advice on how to respond to this red flag>"
+      "advice": "<actionable advice>"
     }
   ],
 
-  "overallScore":          <float 0.0–10.0, weighted average of layer2 scores>,
-  "interestLevel":         <integer 0–100, how interested THE OTHER PERSON seems>,
+  "overallScore":          <float 0.0–10.0>,
+  "interestLevel":         <integer 0–100>,
   "attractionProbability": <integer 0–100>,
   "conversationMomentum":  "<'escalating' | 'neutral' | 'dying'>",
   "emotionalTone":         "<'positive' | 'neutral' | 'negative' | 'mixed'>",
   "replyEnergyMatch":      "<'matched' | 'low' | 'high'>",
   "contextFit":            "<one sentence: how well the conversation fits the stated context>",
-  ${roastMode ? '"roastText": "<3-4 sentence roast that references actual specific messages — be specific, not generic>",' : ''}
+  ${roastMode ? '"roastText": "<3-4 sentence roast that references actual specific messages>",' : ''}
   "tags": ["<tag1>", "<tag2>", "<tag3>"]
-}
-
-Tags — pick all that apply from:
-["one-sided","balanced","flirty","dead-convo","good-banter","overthinking","under-investing","great-opener","missed-spark","needs-confidence","needs-humor","needs-questions","too-eager","too-passive","chemistry-detected","friendship-zone","professional","reconnecting-well","reconnecting-badly","strong-start","weak-close","left-on-read-risk","good-momentum"]`;
+}`;
 }
 
 // ─── Points formula ───────────────────────────────────────────────────────────
@@ -363,62 +345,66 @@ export async function POST(request: NextRequest) {
 
     // ── Parse form data ─────────────────────────────────────────────────────
     const formData  = await request.formData();
-    const image     = formData.get('image')     as File   | null;
+    // GRAB ALL IMAGES (Up to 4)
+    const images    = formData.getAll('image')  as File[];
     const inputText = formData.get('text')      as string | null;
     const context   = (formData.get('context')  as string) || 'dating';
     const language  = (formData.get('language') as string) || 'auto';
     const roastMode = formData.get('roastMode') === 'true';
     const userSide  = (formData.get('userSide') as string) || 'auto';
 
-    if (!image && !inputText?.trim()) {
-      return NextResponse.json({ error: 'Provide an image or paste conversation text.' }, { status: 400 });
+    if (images.length === 0 && !inputText?.trim()) {
+      return NextResponse.json({ error: 'Provide at least one image or paste conversation text.' }, { status: 400 });
     }
 
-    const prompt = buildPrompt(context, language, roastMode, userSide);
+    const prompt = buildPrompt(context, language, roastMode, userSide, images.length);
     let raw = '';
 
-    // ── AI call: vision (screenshot) vs text ────────────────────────────────
-    if (image) {
+    // ── AI call: vision (multiple screenshots) vs text ──────────────────────
+    if (images.length > 0) {
       const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      if (!allowed.includes(image.type)) {
-        return NextResponse.json({ error: 'Upload a JPG, PNG, or WebP screenshot.' }, { status: 400 });
-      }
-      if (image.size > 10 * 1024 * 1024) {
-        return NextResponse.json({ error: 'Image too large. Max 10MB.' }, { status: 400 });
+      
+      const contentBlocks: any[] = [];
+      
+      for (const img of images) {
+        if (!allowed.includes(img.type)) {
+          return NextResponse.json({ error: 'Upload JPG, PNG, or WebP screenshots only.' }, { status: 400 });
+        }
+        if (img.size > 10 * 1024 * 1024) {
+          return NextResponse.json({ error: 'One of the images is too large. Max 10MB per image.' }, { status: 400 });
+        }
+
+        const bytes  = await img.arrayBuffer();
+        const base64 = Buffer.from(bytes).toString('base64');
+        const mtype  = img.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+        
+        // Add each image to the AI prompt block
+        contentBlocks.push({
+          type: 'image_url',
+          image_url: { url: `data:${mtype};base64,${base64}` }
+        });
       }
 
-      const bytes  = await image.arrayBuffer();
-      const base64 = Buffer.from(bytes).toString('base64');
-      const mtype  = image.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      // Add the final text prompt at the end
+      contentBlocks.push({ type: 'text', text: prompt });
 
       try {
+        // Updated to Groq's absolute best Vision model for superior intelligence and tracking across images
         const completion = await groq.chat.completions.create({
           model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: `data:${mtype};base64,${base64}` } },
-              { type: 'text',      text: prompt },
-            ],
-          }],
+          messages: [{ role: 'user', content: contentBlocks }],
           temperature: 0.10,
-          max_tokens:  3500,
+          max_tokens:  4500, // Increased to support larger 4-image responses
         });
         raw = completion.choices[0]?.message?.content?.trim() ?? '';
       } catch (visionErr: any) {
-        // Fallback to maverick on rate-limit or overload
+        // Fallback to the 11b vision model on rate-limit or overload
         if (visionErr?.status === 429 || visionErr?.status === 503) {
           const fallback = await groq.chat.completions.create({
             model: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: `data:${mtype};base64,${base64}` } },
-                { type: 'text',      text: prompt },
-              ],
-            }],
+            messages: [{ role: 'user', content: contentBlocks }],
             temperature: 0.10,
-            max_tokens:  3000,
+            max_tokens:  4000,
           });
           raw = fallback.choices[0]?.message?.content?.trim() ?? '';
         } else {
@@ -519,7 +505,7 @@ export async function POST(request: NextRequest) {
       roastMode,
       roastText:  roastMode ? String(parsed.roastText || '') : undefined,
       context,
-      inputMode:  image ? 'screenshot' : 'text',
+      inputMode:  images.length > 0 ? 'screenshot' : 'text',
     };
 
     // ── Persist & update counters ─────────────────────────────────────────────
@@ -529,7 +515,6 @@ export async function POST(request: NextRequest) {
       try {
         await connectToDatabase();
         
-        // Add "as any" here to stop TS from complaining about "context"
         const doc = await ChatAnalysis.create({
           userId,
           conversationScore:     result.overallScore,
@@ -542,10 +527,9 @@ export async function POST(request: NextRequest) {
           extractedText:         result.extractedText,
           context,
           inputMode:             result.inputMode,
-          fullAnalysis:          result, // Added this so it saves your 10-layer data!
+          fullAnalysis:          result, 
         } as any); 
 
-        // Wrap doc in (doc as any) so TS knows _id exists
         savedId = (doc as any)._id.toString();
 
         const pts = scoreToPoints(result.overallScore);
@@ -561,12 +545,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Build response; set anon cookie if needed ────────────────────────────
     const response = NextResponse.json({ success: true, id: savedId, ...result });
 
     if (!userId) {
       response.cookies.set(ANON_COOKIE, '1', {
-        maxAge:   60 * 60 * 24 * 90, // 90 days
+        maxAge:   60 * 60 * 24 * 90, 
         httpOnly: true,
         sameSite: 'lax',
         path:     '/',

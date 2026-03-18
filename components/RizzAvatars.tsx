@@ -1,199 +1,190 @@
 'use client';
 
-// components/RizzAvatars.tsx — Animated SVG avatars for Rizz Link pages
+// components/RizzAvatars.tsx — Brutalist Animated SVG avatars
 import { motion } from 'framer-motion';
 
 export type AvatarType = 'cat' | 'dog' | 'fox' | 'robot' | 'panda';
 
-const float = {
-  animate: { y: [0, -6, 0] },
-  transition: { duration: 3, repeat: Infinity, ease: 'easeInOut' as const },
+// Neo-Brutalism Palette
+const C = {
+  cream: '#F3EDE2',
+  ink:   '#0F0C09',
+  red:   '#D13920',
+  yellow:'#FFD84D',
+  blue:  '#4F46E5',
+  green: '#22C55E',
+  pink:  '#FF6FD8',
+  white: '#FFFFFF'
 };
 
-// ─── Cat ──────────────────────────────────────────────────────────────────────
+const float = {
+  animate: { y: [0, -4, 0] },
+  transition: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' as const },
+};
+
+// ─── Cat (Brutalist) ──────────────────────────────────────────────────────────
 function CatAvatar({ size }: { size: number }) {
   return (
     <motion.svg {...float} width={size} height={size} viewBox="0 0 80 80" fill="none">
-      {/* Body */}
-      <ellipse cx="40" cy="52" rx="22" ry="18" fill="#2A2A3E" />
-      {/* Head */}
-      <circle cx="40" cy="33" r="20" fill="#2A2A3E" />
-      {/* Ears */}
-      <polygon points="22,20 16,6 30,16" fill="#2A2A3E" />
-      <polygon points="58,20 64,6 50,16" fill="#2A2A3E" />
-      <polygon points="24,19 19,9 30,17" fill="#FF5B3A" opacity="0.7" />
-      <polygon points="56,19 61,9 50,17" fill="#FF5B3A" opacity="0.7" />
-      {/* Eyes */}
-      <motion.ellipse cx="33" cy="33" rx="3.5" ry="4"
-        fill="#4DEBA1"
-        animate={{ ry: [4, 0.8, 4] }}
-        transition={{ duration: 4, repeat: Infinity, repeatDelay: 2 }}
-      />
-      <motion.ellipse cx="47" cy="33" rx="3.5" ry="4"
-        fill="#4DEBA1"
-        animate={{ ry: [4, 0.8, 4] }}
-        transition={{ duration: 4, repeat: Infinity, repeatDelay: 2 }}
-      />
-      {/* Nose */}
-      <ellipse cx="40" cy="39" rx="2" ry="1.5" fill="#FF5B3A" />
-      {/* Whiskers */}
-      <line x1="20" y1="39" x2="36" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-      <line x1="20" y1="42" x2="36" y2="41" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-      <line x1="44" y1="40" x2="60" y2="39" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-      <line x1="44" y1="41" x2="60" y2="42" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-      {/* Tail */}
-      <motion.path d="M 62 58 Q 75 50 70 38"
-        stroke="#2A2A3E" strokeWidth="5" strokeLinecap="round" fill="none"
-        animate={{ d: ['M 62 58 Q 75 50 70 38', 'M 62 58 Q 78 52 73 40', 'M 62 58 Q 75 50 70 38'] }}
-        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-      />
+      {/* Hard Shadow */}
+      <ellipse cx="44" cy="56" rx="22" ry="18" fill={C.ink} />
+      <circle cx="44" cy="37" r="20" fill={C.ink} />
+      
+      {/* Body & Head */}
+      <ellipse cx="40" cy="52" rx="22" ry="18" fill={C.yellow} stroke={C.ink} strokeWidth="4" />
+      <circle cx="40" cy="33" r="20" fill={C.yellow} stroke={C.ink} strokeWidth="4" />
+      
+      {/* Sharp Ears */}
+      <polygon points="22,20 16,6 30,16" fill={C.yellow} stroke={C.ink} strokeWidth="4" strokeLinejoin="round" />
+      <polygon points="58,20 64,6 50,16" fill={C.yellow} stroke={C.ink} strokeWidth="4" strokeLinejoin="round" />
+      <polygon points="24,19 19,9 30,17" fill={C.pink} stroke={C.ink} strokeWidth="3" />
+      <polygon points="56,19 61,9 50,17" fill={C.pink} stroke={C.ink} strokeWidth="3" />
+      
+      {/* Deadpan Eyes */}
+      <circle cx="32" cy="31" r="4" fill={C.ink} />
+      <circle cx="48" cy="31" r="4" fill={C.ink} />
+      
+      {/* Triangle Nose */}
+      <polygon points="38,38 42,38 40,41" fill={C.red} />
+      
+      {/* Thick Whiskers */}
+      <line x1="16" y1="36" x2="26" y2="38" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
+      <line x1="14" y1="42" x2="25" y2="41" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
+      <line x1="54" y1="38" x2="64" y2="36" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
+      <line x1="55" y1="41" x2="66" y2="42" stroke={C.ink} strokeWidth="3" strokeLinecap="round" />
     </motion.svg>
   );
 }
 
-// ─── Dog ──────────────────────────────────────────────────────────────────────
+// ─── Dog (Brutalist) ──────────────────────────────────────────────────────────
 function DogAvatar({ size }: { size: number }) {
   return (
     <motion.svg {...float} width={size} height={size} viewBox="0 0 80 80" fill="none">
-      <ellipse cx="40" cy="54" rx="22" ry="16" fill="#3B2F2F" />
-      <circle cx="40" cy="34" r="20" fill="#3B2F2F" />
-      {/* Floppy ears */}
-      <motion.ellipse cx="22" cy="34" rx="7" ry="14" fill="#2A1F1F"
-        animate={{ rotate: [-5, 5, -5] }} transition={{ duration: 2, repeat: Infinity }}
-        style={{ transformOrigin: '22px 24px' }}
+      {/* Hard Shadow */}
+      <ellipse cx="44" cy="58" rx="22" ry="16" fill={C.ink} />
+      <circle cx="44" cy="38" r="20" fill={C.ink} />
+
+      {/* Body & Head */}
+      <ellipse cx="40" cy="54" rx="22" ry="16" fill={C.blue} stroke={C.ink} strokeWidth="4" />
+      <circle cx="40" cy="34" r="20" fill={C.blue} stroke={C.ink} strokeWidth="4" />
+
+      {/* Snout Box */}
+      <ellipse cx="40" cy="42" rx="12" ry="9" fill={C.cream} stroke={C.ink} strokeWidth="3" />
+      <ellipse cx="40" cy="38" rx="4" ry="3" fill={C.ink} />
+
+      {/* Blocky Tongue */}
+      <motion.path d="M 37 45 V 50 A 3 3 0 0 0 43 50 V 45 Z" fill={C.red} stroke={C.ink} strokeWidth="3" 
+        animate={{ scaleY: [1, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity }} style={{ transformOrigin: '40px 45px' }}
       />
-      <motion.ellipse cx="58" cy="34" rx="7" ry="14" fill="#2A1F1F"
-        animate={{ rotate: [5, -5, 5] }} transition={{ duration: 2, repeat: Infinity }}
-        style={{ transformOrigin: '58px 24px' }}
+
+      {/* Happy Squint Eyes */}
+      <path d="M 30 28 Q 33 25 36 28" stroke={C.ink} strokeWidth="4" strokeLinecap="round" fill="none" />
+      <path d="M 44 28 Q 47 25 50 28" stroke={C.ink} strokeWidth="4" strokeLinecap="round" fill="none" />
+
+      {/* Floppy Ears */}
+      <motion.ellipse cx="18" cy="36" rx="8" ry="16" fill={C.blue} stroke={C.ink} strokeWidth="4"
+        animate={{ rotate: [-5, 5, -5] }} transition={{ duration: 2, repeat: Infinity }} style={{ transformOrigin: '18px 20px' }}
       />
-      {/* Eyes */}
-      <motion.circle cx="33" cy="32" r="4" fill="#7B6CF6"
-        animate={{ r: [4, 1, 4] }} transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2 }}
-      />
-      <motion.circle cx="47" cy="32" r="4" fill="#7B6CF6"
-        animate={{ r: [4, 1, 4] }} transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2 }}
-      />
-      {/* Nose */}
-      <ellipse cx="40" cy="40" rx="4" ry="3" fill="#111" />
-      <ellipse cx="38.5" cy="39" rx="1" ry="0.8" fill="rgba(255,255,255,0.3)" />
-      {/* Tongue */}
-      <motion.ellipse cx="40" cy="46" rx="5" ry="4" fill="#FF5B3A"
-        animate={{ scaleY: [1, 1.15, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
+      <motion.ellipse cx="62" cy="36" rx="8" ry="16" fill={C.blue} stroke={C.ink} strokeWidth="4"
+        animate={{ rotate: [5, -5, 5] }} transition={{ duration: 2, repeat: Infinity }} style={{ transformOrigin: '62px 20px' }}
       />
     </motion.svg>
   );
 }
 
-// ─── Fox ──────────────────────────────────────────────────────────────────────
+// ─── Fox (Brutalist) ──────────────────────────────────────────────────────────
 function FoxAvatar({ size }: { size: number }) {
   return (
     <motion.svg {...float} width={size} height={size} viewBox="0 0 80 80" fill="none">
-      <ellipse cx="40" cy="54" rx="20" ry="15" fill="#E8610A" />
-      <circle cx="40" cy="34" r="20" fill="#E8610A" />
-      {/* Pointed ears */}
-      <polygon points="22,22 14,4 32,18" fill="#E8610A" />
-      <polygon points="58,22 66,4 48,18" fill="#E8610A" />
-      <polygon points="23,21 17,8 31,19" fill="#F5C842" opacity="0.8" />
-      <polygon points="57,21 63,8 49,19" fill="#F5C842" opacity="0.8" />
-      {/* White face mask */}
-      <ellipse cx="40" cy="39" rx="13" ry="11" fill="#F5E6D0" />
-      {/* Eyes */}
-      <motion.ellipse cx="33" cy="33" rx="3" ry="4" fill="#2A1800"
-        animate={{ ry: [4, 0.6, 4] }} transition={{ duration: 4, repeat: Infinity, repeatDelay: 1.5 }}
-      />
-      <motion.ellipse cx="47" cy="33" rx="3" ry="4" fill="#2A1800"
-        animate={{ ry: [4, 0.6, 4] }} transition={{ duration: 4, repeat: Infinity, repeatDelay: 1.5 }}
-      />
-      <circle cx="34" cy="32" r="1" fill="white" />
-      <circle cx="48" cy="32" r="1" fill="white" />
-      {/* Nose */}
-      <ellipse cx="40" cy="39" rx="2.5" ry="2" fill="#2A1800" />
-      {/* Bushy tail */}
-      <motion.path d="M 60 56 Q 76 46 68 28 Q 80 32 75 20"
-        stroke="#E8610A" strokeWidth="6" strokeLinecap="round" fill="none"
-        animate={{ d: ['M 60 56 Q 76 46 68 28 Q 80 32 75 20', 'M 60 56 Q 78 48 70 30 Q 82 34 77 22', 'M 60 56 Q 76 46 68 28 Q 80 32 75 20'] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      />
+      {/* Hard Shadow */}
+      <ellipse cx="44" cy="58" rx="20" ry="15" fill={C.ink} />
+      <circle cx="44" cy="38" r="20" fill={C.ink} />
+
+      {/* Body & Head */}
+      <ellipse cx="40" cy="54" rx="20" ry="15" fill={C.red} stroke={C.ink} strokeWidth="4" />
+      <circle cx="40" cy="34" r="20" fill={C.red} stroke={C.ink} strokeWidth="4" />
+
+      {/* Sharp Mask */}
+      <polygon points="20,34 40,50 60,34 40,24" fill={C.cream} stroke={C.ink} strokeWidth="3" strokeLinejoin="round" />
+      
+      {/* Dot Nose */}
+      <circle cx="40" cy="48" r="3" fill={C.ink} />
+
+      {/* Slit Eyes */}
+      <line x1="28" y1="32" x2="34" y2="34" stroke={C.ink} strokeWidth="4" strokeLinecap="round" />
+      <line x1="46" y1="34" x2="52" y2="32" stroke={C.ink} strokeWidth="4" strokeLinecap="round" />
+
+      {/* Pointed Ears */}
+      <polygon points="22,22 14,4 32,18" fill={C.red} stroke={C.ink} strokeWidth="4" strokeLinejoin="round" />
+      <polygon points="58,22 66,4 48,18" fill={C.red} stroke={C.ink} strokeWidth="4" strokeLinejoin="round" />
     </motion.svg>
   );
 }
 
-// ─── Robot ────────────────────────────────────────────────────────────────────
+// ─── Robot (Brutalist) ────────────────────────────────────────────────────────
 function RobotAvatar({ size }: { size: number }) {
   return (
     <motion.svg {...float} width={size} height={size} viewBox="0 0 80 80" fill="none">
-      {/* Body */}
-      <rect x="22" y="48" width="36" height="22" rx="4" fill="#1E1E2E" stroke="#7B6CF6" strokeWidth="1" />
-      {/* Head */}
-      <rect x="18" y="18" width="44" height="36" rx="6" fill="#1E1E2E" stroke="#7B6CF6" strokeWidth="1.5" />
+      {/* Hard Shadow */}
+      <rect x="22" y="22" width="44" height="36" rx="4" fill={C.ink} />
+
+      {/* Box Head */}
+      <rect x="18" y="18" width="44" height="36" rx="4" fill={C.white} stroke={C.ink} strokeWidth="4" />
+
       {/* Antenna */}
-      <line x1="40" y1="18" x2="40" y2="10" stroke="#7B6CF6" strokeWidth="2" />
-      <motion.circle cx="40" cy="8" r="3" fill="#7B6CF6"
-        animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }}
+      <line x1="40" y1="18" x2="40" y2="6" stroke={C.ink} strokeWidth="4" />
+      <motion.circle cx="40" cy="6" r="4" fill={C.yellow} stroke={C.ink} strokeWidth="3"
+        animate={{ fill: [C.yellow, C.red, C.yellow] }} transition={{ duration: 1.5, repeat: Infinity }}
       />
-      {/* Eyes — LED screens */}
-      <motion.rect x="24" y="26" width="12" height="10" rx="2" fill="#4DEBA1"
-        animate={{ opacity: [1, 0.6, 1] }} transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-      />
-      <motion.rect x="44" y="26" width="12" height="10" rx="2" fill="#4DEBA1"
-        animate={{ opacity: [1, 0.6, 1] }} transition={{ duration: 2, repeat: Infinity }}
-      />
-      {/* Pupils */}
-      <motion.circle cx="30" cy="31" r="2.5" fill="#111"
-        animate={{ cx: [30, 32, 30, 28, 30] }} transition={{ duration: 3, repeat: Infinity }}
-      />
-      <motion.circle cx="50" cy="31" r="2.5" fill="#111"
-        animate={{ cx: [50, 52, 50, 48, 50] }} transition={{ duration: 3, repeat: Infinity }}
-      />
-      {/* Mouth panel */}
-      <rect x="27" y="42" width="26" height="6" rx="2" fill="#0A0A15" stroke="#7B6CF670" strokeWidth="1" />
-      <motion.rect x="29" y="44" width="4" height="2" rx="1" fill="#FF5B3A"
-        animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
-      />
-      <motion.rect x="35" y="44" width="4" height="2" rx="1" fill="#F5C842"
-        animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
-      />
-      <motion.rect x="41" y="44" width="4" height="2" rx="1" fill="#4DEBA1"
-        animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
-      />
-      {/* Side bolts */}
-      <circle cx="18" cy="30" r="2" fill="#7B6CF6" opacity="0.5" />
-      <circle cx="62" cy="30" r="2" fill="#7B6CF6" opacity="0.5" />
+
+      {/* Screen Eyes */}
+      <rect x="26" y="26" width="10" height="8" fill={C.green} stroke={C.ink} strokeWidth="3" />
+      <rect x="44" y="26" width="10" height="8" fill={C.green} stroke={C.ink} strokeWidth="3" />
+
+      {/* Grid Mouth */}
+      <rect x="28" y="42" width="24" height="6" fill={C.pink} stroke={C.ink} strokeWidth="3" />
+      <line x1="34" y1="42" x2="34" y2="48" stroke={C.ink} strokeWidth="3" />
+      <line x1="40" y1="42" x2="40" y2="48" stroke={C.ink} strokeWidth="3" />
+      <line x1="46" y1="42" x2="46" y2="48" stroke={C.ink} strokeWidth="3" />
+
+      {/* Side Bolts */}
+      <rect x="12" y="32" width="6" height="8" fill={C.yellow} stroke={C.ink} strokeWidth="3" />
+      <rect x="62" y="32" width="6" height="8" fill={C.yellow} stroke={C.ink} strokeWidth="3" />
     </motion.svg>
   );
 }
 
-// ─── Panda ────────────────────────────────────────────────────────────────────
+// ─── Panda (Brutalist) ────────────────────────────────────────────────────────
 function PandaAvatar({ size }: { size: number }) {
   return (
     <motion.svg {...float} width={size} height={size} viewBox="0 0 80 80" fill="none">
-      <ellipse cx="40" cy="54" rx="22" ry="16" fill="white" />
-      <circle cx="40" cy="33" r="20" fill="white" />
-      {/* Ears */}
-      <circle cx="22" cy="18" r="9" fill="#111" />
-      <circle cx="58" cy="18" r="9" fill="#111" />
-      <circle cx="22" cy="18" r="5" fill="#222" />
-      <circle cx="58" cy="18" r="5" fill="#222" />
-      {/* Eye patches */}
-      <ellipse cx="32" cy="32" rx="7" ry="6" fill="#111" />
-      <ellipse cx="48" cy="32" rx="7" ry="6" fill="#111" />
-      {/* Eyes */}
-      <motion.circle cx="32" cy="33" r="3.5" fill="#4DEBA1"
-        animate={{ r: [3.5, 0.8, 3.5] }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-      />
-      <motion.circle cx="48" cy="33" r="3.5" fill="#4DEBA1"
-        animate={{ r: [3.5, 0.8, 3.5] }} transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-      />
-      {/* Nose */}
-      <ellipse cx="40" cy="39" rx="3" ry="2.5" fill="#111" />
-      {/* Mouth */}
-      <path d="M 36 43 Q 40 47 44 43" stroke="#ccc" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      {/* Bamboo */}
-      <motion.g animate={{ rotate: [-5, 5, -5] }} transition={{ duration: 2, repeat: Infinity }}
-        style={{ transformOrigin: '68px 65px' }}>
-        <rect x="64" y="50" width="4" height="20" rx="2" fill="#4DEBA1" opacity="0.7" />
-        <line x1="64" y1="56" x2="68" y2="56" stroke="#3BC885" strokeWidth="1" />
-        <line x1="64" y1="62" x2="68" y2="62" stroke="#3BC885" strokeWidth="1" />
+      {/* Hard Shadow */}
+      <ellipse cx="44" cy="58" rx="22" ry="16" fill={C.ink} />
+      <circle cx="44" cy="37" r="20" fill={C.ink} />
+
+      {/* Black Ears */}
+      <circle cx="22" cy="18" r="8" fill={C.ink} />
+      <circle cx="58" cy="18" r="8" fill={C.ink} />
+
+      {/* Body & Head */}
+      <ellipse cx="40" cy="54" rx="22" ry="16" fill={C.cream} stroke={C.ink} strokeWidth="4" />
+      <circle cx="40" cy="33" r="20" fill={C.cream} stroke={C.ink} strokeWidth="4" />
+
+      {/* Geometric Patches */}
+      <polygon points="26,26 36,28 32,38 22,34" fill={C.ink} strokeLinejoin="round" />
+      <polygon points="54,26 44,28 48,38 58,34" fill={C.ink} strokeLinejoin="round" />
+
+      {/* Dot Eyes */}
+      <circle cx="30" cy="31" r="2" fill={C.white} />
+      <circle cx="50" cy="31" r="2" fill={C.white} />
+
+      {/* Sharp Nose */}
+      <polygon points="38,40 42,40 40,43" fill={C.ink} />
+
+      {/* Blocky Bamboo */}
+      <motion.g animate={{ rotate: [-5, 5, -5] }} transition={{ duration: 2, repeat: Infinity }} style={{ transformOrigin: '64px 56px' }}>
+        <rect x="60" y="44" width="8" height="24" fill={C.green} stroke={C.ink} strokeWidth="3" transform="rotate(-15 64 56)" />
+        <line x1="58" y1="52" x2="68" y2="49" stroke={C.ink} strokeWidth="3" />
       </motion.g>
     </motion.svg>
   );

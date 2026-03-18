@@ -3,11 +3,20 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS — Neo-Brutalism ───────────────────────────────────────────
 const C = {
-  cream: '#F3EDE2', ink: '#0F0C09', red: '#D13920',
-  warm1: '#E8E0D2', warm2: '#D4CBBA', muted: '#8A8074',
-  green: '#2D8A4E', amber: '#B87A10', teal: '#3A7A8A',
+  cream:     '#FFF7E6',
+  ink:       '#0D0D0D',
+  red:       '#FF4D4D',
+  yellow:    '#FFD84D',
+  blue:      '#4F46E5',
+  green:     '#22C55E',
+  pink:      '#FF6FD8',
+  white:     '#FFFFFF',
+  shadow:    '4px 4px 0px #0D0D0D',
+  shadowSm:  '2px 2px 0px #0D0D0D',
+  border:    '3px solid #0D0D0D',
+  borderThin:'2px solid #0D0D0D',
 };
 
 interface ShareCardProps {
@@ -25,7 +34,7 @@ interface ShareCardProps {
 
 function getScoreColor(score: number) {
   if (score >= 7) return C.green;
-  if (score >= 5) return C.amber;
+  if (score >= 5) return C.yellow;
   return C.red;
 }
 
@@ -56,12 +65,12 @@ export default function ShareCard({
       // Dynamic import html2canvas
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(cardRef.current, {
-        backgroundColor: C.ink,
+        backgroundColor: C.cream, // Match the card's background to avoid weird edges
         scale: 2,
         useCORS: true,
       });
       const link = document.createElement('a');
-      link.download = `convocoach-${isRoast ? 'roast' : 'score'}-${score.toFixed(1)}.png`;
+      link.download = `convocoach-${isRoast ? 'roast' : 'score'}-${(score || 0).toFixed(1)}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch {
@@ -73,21 +82,23 @@ export default function ShareCard({
   };
 
   const handleCopyText = () => {
+    const safeScore = score || 0;
     const text = isRoast && roastText
-      ? `🔥 My ConvoCoach Roast: "${roastText}" — Score: ${score.toFixed(1)}/10\n\nGet roasted at convocoach.ai`
-      : `💬 My ConvoCoach Score: ${score.toFixed(1)}/10 — ${getScoreLabel(score)}\n🎯 Interest: ${interestLevel}% | Attraction: ${attractionProbability}%\n${personalityType ? `👤 Style: ${personalityEmoji} ${personalityType}` : ''}\n\nAnalyze your texts at convocoach.ai`;
+      ? `🔥 My ConvoCoach Roast: "${roastText}" — Score: ${safeScore.toFixed(1)}/10\n\nGet roasted at convocoach.xyz`
+      : `💬 My ConvoCoach Score: ${safeScore.toFixed(1)}/10 — ${getScoreLabel(safeScore)}\n🎯 Interest: ${interestLevel}% | Attraction: ${attractionProbability}%\n${personalityType ? `👤 Style: ${personalityEmoji} ${personalityType}` : ''}\n\nAnalyze your texts at convocoach.xyz`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShare = async () => {
+    const safeScore = score || 0;
     const shareData = {
-      title: isRoast ? `🔥 My ConvoCoach Roast` : `💬 My ConvoCoach Score: ${score.toFixed(1)}/10`,
+      title: isRoast ? `🔥 My ConvoCoach Roast` : `💬 My ConvoCoach Score: ${safeScore.toFixed(1)}/10`,
       text: isRoast && roastText
-        ? `🔥 "${roastText}" — Score: ${score.toFixed(1)}/10`
-        : `My conversation score: ${score.toFixed(1)}/10 — ${getScoreLabel(score)}`,
-      url: 'https://convocoach.ai',
+        ? `🔥 "${roastText}" — Score: ${safeScore.toFixed(1)}/10`
+        : `My conversation score: ${safeScore.toFixed(1)}/10 — ${getScoreLabel(safeScore)}`,
+      url: 'https://convocoach.xyz',
     };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch {}
@@ -97,168 +108,169 @@ export default function ShareCard({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ─── The Card (for screenshot) ─── */}
       <div
         ref={cardRef}
         style={{
-          background: C.ink,
-          borderRadius: 22,
-          padding: 'clamp(24px, 5vw, 36px)',
+          background: C.cream,
+          border: C.border,
+          borderRadius: 24,
+          padding: 'clamp(24px, 5vw, 40px)',
           position: 'relative',
           overflow: 'hidden',
-          border: `1px solid rgba(255,255,255,0.08)`,
+          boxShadow: C.shadowLg,
         }}
       >
-        {/* Radial glow */}
-        <div style={{
-          position: 'absolute', right: -60, top: -60,
-          width: 300, height: 300, borderRadius: '50%',
-          background: `radial-gradient(circle, ${scColor}15, transparent 65%)`,
-          pointerEvents: 'none',
-        }} />
-
-        {/* Brand */}
+        {/* Brand Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: 24, position: 'relative', zIndex: 1,
+          marginBottom: 24, paddingBottom: 16, borderBottom: `3px dashed ${C.ink}`,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.red }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: C.red, border: '2px solid #000' }} />
             <span style={{
-              fontSize: 12, fontWeight: 800, color: `${C.cream}50`,
-              fontFamily: "'Bricolage Grotesque', sans-serif",
+              fontSize: 14, fontWeight: 900, color: C.ink,
+              fontFamily: "'DM Sans', sans-serif",
               letterSpacing: '0.1em', textTransform: 'uppercase',
             }}>ConvoCoach</span>
           </div>
           <span style={{
-            fontSize: 10, color: `${C.cream}30`,
+            fontSize: 12, fontWeight: 800, color: C.ink,
             fontFamily: "'DM Sans', sans-serif",
-          }}>convocoach.ai</span>
+          }}>convocoach.xyz</span>
         </div>
 
-        {/* Score */}
-        <div style={{ position: 'relative', zIndex: 1, marginBottom: 20 }}>
+        {/* Score Section */}
+        <div style={{ marginBottom: 28, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <div style={{
-            fontSize: 10, fontWeight: 700, color: `${C.cream}30`,
-            textTransform: 'uppercase', letterSpacing: '0.14em',
-            fontFamily: 'monospace', marginBottom: 10,
+            fontSize: 12, fontWeight: 900, color: C.ink,
+            textTransform: 'uppercase', letterSpacing: '0.1em',
+            fontFamily: "'DM Sans', sans-serif", marginBottom: 12,
+            background: isRoast ? C.red : C.yellow,
+            padding: '4px 12px', borderRadius: 8, border: C.borderThin,
+            boxShadow: C.shadowSm,
           }}>
             {isRoast ? '🔥 Roast Mode' : 'Conversation Score'}
           </div>
+          
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
             <span style={{
-              fontFamily: "'Bricolage Grotesque', sans-serif",
-              fontSize: 'clamp(56px, 12vw, 72px)', fontWeight: 900,
-              color: scColor, lineHeight: 1, letterSpacing: '-0.05em',
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 'clamp(64px, 14vw, 88px)', fontWeight: 900,
+              color: C.ink, lineHeight: 0.9, letterSpacing: '-0.04em',
             }}>{(score || 0).toFixed(1)}</span>
             <span style={{
-              fontSize: 22, color: `${C.cream}20`,
-              fontFamily: "'Bricolage Grotesque', sans-serif",
+              fontSize: 28, fontWeight: 800, color: '#555',
+              fontFamily: "'DM Sans', sans-serif",
             }}>/10</span>
           </div>
+          
           <div style={{
-            fontSize: 15, fontWeight: 800, color: scColor,
-            fontFamily: "'Bricolage Grotesque', sans-serif",
-            marginBottom: 6,
-          }}>{getScoreLabel(score)}</div>
+            fontSize: 18, fontWeight: 900, color: C.ink,
+            fontFamily: "'DM Sans', sans-serif",
+            background: scColor, padding: '6px 16px', borderRadius: 10,
+            border: C.borderThin, display: 'inline-block',
+          }}>{getScoreLabel(score || 0)}</div>
         </div>
 
         {/* Roast text (if roast mode) */}
         {isRoast && roastText && (
           <div style={{
-            background: `${C.red}10`, border: `1px solid ${C.red}25`,
-            borderRadius: 14, padding: '14px 18px', marginBottom: 20,
-            position: 'relative', zIndex: 1,
+            background: C.pink, border: C.borderThin,
+            borderRadius: 16, padding: '20px', marginBottom: 24,
+            boxShadow: C.shadowSm,
           }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>AI Verdict</div>
             <p style={{
-              fontSize: 14, color: `${C.cream}70`, lineHeight: 1.7,
-              fontStyle: 'italic', margin: 0, fontFamily: 'Georgia, serif',
+              fontSize: 16, color: C.ink, lineHeight: 1.6,
+              fontStyle: 'italic', margin: 0, fontFamily: "'DM Sans', sans-serif", fontWeight: 700,
             }}>"{roastText}"</p>
           </div>
         )}
 
-        {/* Stats Row */}
+        {/* Stats Grid */}
         <div style={{
-          display: 'flex', gap: 12, marginBottom: 16,
-          position: 'relative', zIndex: 1,
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24,
         }}>
           {[
-            { label: 'Their Interest', val: `${interestLevel}%`, color: '#A0426E' },
-            { label: 'Attraction', val: `${attractionProbability}%`, color: C.amber },
-            { label: 'Momentum', val: momentum === 'escalating' ? '↑ Rising' : momentum === 'dying' ? '↓ Fading' : '→ Flat', color: momentum === 'escalating' ? C.green : momentum === 'dying' ? C.red : C.amber },
+            { label: 'Interest', val: `${interestLevel}%`, color: C.blue },
+            { label: 'Attract', val: `${attractionProbability}%`, color: C.pink },
+            { label: 'Momentum', val: momentum === 'escalating' ? 'Rising' : momentum === 'dying' ? 'Fading' : 'Flat', color: momentum === 'escalating' ? C.green : momentum === 'dying' ? C.red : C.yellow },
           ].map((stat, i) => (
             <div key={i} style={{
-              flex: 1, background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 12, padding: '10px 12px', textAlign: 'center',
+              background: C.white,
+              border: C.borderThin,
+              borderRadius: 14, padding: '16px 12px', textAlign: 'center',
+              boxShadow: C.shadowSm, display: 'flex', flexDirection: 'column', justifyContent: 'center'
             }}>
-              <div style={{ fontSize: 9, color: `${C.cream}30`, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5, fontFamily: 'monospace' }}>{stat.label}</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: stat.color, fontFamily: "'Bricolage Grotesque', sans-serif", lineHeight: 1 }}>{stat.val}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.ink, fontFamily: "'DM Sans', sans-serif", lineHeight: 1, marginBottom: 6 }}>{stat.val}</div>
+              <div style={{ fontSize: 10, color: C.ink, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'DM Sans', sans-serif" }}>{stat.label}</div>
             </div>
           ))}
         </div>
 
         {/* Personality & Tags */}
-        <div style={{
-          display: 'flex', gap: 6, flexWrap: 'wrap',
-          position: 'relative', zIndex: 1,
-        }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {personalityType && (
             <span style={{
-              fontSize: 10, fontWeight: 700, padding: '4px 10px',
-              borderRadius: 6, background: `${C.teal}15`,
-              color: C.teal, border: `1px solid ${C.teal}30`,
+              fontSize: 11, fontWeight: 900, padding: '6px 12px',
+              borderRadius: 8, background: C.white,
+              color: C.ink, border: C.borderThin, fontFamily: "'DM Sans', sans-serif", textTransform: 'uppercase'
             }}>{personalityEmoji} {personalityType}</span>
           )}
           {tags.slice(0, 3).map((tag, i) => (
             <span key={i} style={{
-              fontSize: 10, fontWeight: 600, padding: '4px 10px',
-              borderRadius: 6, background: 'rgba(255,255,255,0.04)',
-              color: `${C.cream}40`, border: '1px solid rgba(255,255,255,0.07)',
-              textTransform: 'capitalize',
+              fontSize: 11, fontWeight: 900, padding: '6px 12px',
+              borderRadius: 8, background: C.ink,
+              color: C.white, border: C.borderThin,
+              textTransform: 'uppercase', fontFamily: "'DM Sans', sans-serif"
             }}>{tag.replace(/-/g, ' ')}</span>
           ))}
         </div>
 
-        {/* Verdict */}
-        {verdict && (
-          <p style={{
-            fontSize: 13, color: `${C.cream}40`, lineHeight: 1.7,
-            fontStyle: 'italic', marginTop: 16, fontFamily: 'Georgia, serif',
-            position: 'relative', zIndex: 1,
-          }}>"{verdict}"</p>
+        {/* Verdict (If not roast mode) */}
+        {verdict && !isRoast && (
+          <div style={{ marginTop: 24, paddingTop: 20, borderTop: C.borderThin }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Diagnosis</div>
+            <p style={{
+              fontSize: 14, color: '#333', lineHeight: 1.6,
+              margin: 0, fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
+            }}>{verdict}</p>
+          </div>
         )}
       </div>
 
       {/* ─── Action Buttons ─── */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <motion.button
           onClick={handleDownload}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -2, boxShadow: C.shadowSm }}
+          whileTap={{ y: 0, boxShadow: 'none' }}
           disabled={downloading}
           style={{
-            flex: 1, padding: '12px 16px', borderRadius: 12,
-            background: C.ink, color: C.cream, border: `1.5px solid ${C.warm2}30`,
-            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            flex: '1 1 140px', padding: '14px 16px', borderRadius: 14,
+            background: C.ink, color: C.white, border: C.borderThin,
+            fontSize: 14, fontWeight: 900, cursor: downloading ? 'not-allowed' : 'pointer',
             fontFamily: "'DM Sans', sans-serif",
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: C.shadowSm, opacity: downloading ? 0.7 : 1,
           }}
         >
-          {downloading ? '⏳ Saving...' : '📥 Save as Image'}
+          {downloading ? '⏳ Saving...' : '📥 Save Image'}
         </motion.button>
 
         <motion.button
           onClick={handleShare}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -2, boxShadow: C.shadowSm }}
+          whileTap={{ y: 0, boxShadow: 'none' }}
           style={{
-            flex: 1, padding: '12px 16px', borderRadius: 12,
-            background: scColor, color: '#fff', border: 'none',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            flex: '1 1 140px', padding: '14px 16px', borderRadius: 14,
+            background: scColor, color: C.ink, border: C.borderThin,
+            fontSize: 14, fontWeight: 900, cursor: 'pointer',
             fontFamily: "'DM Sans', sans-serif",
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: C.shadowSm,
           }}
         >
           📤 Share
@@ -266,17 +278,16 @@ export default function ShareCard({
 
         <motion.button
           onClick={handleCopyText}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ y: -2, boxShadow: C.shadowSm }}
+          whileTap={{ y: 0, boxShadow: 'none' }}
           style={{
-            padding: '12px 16px', borderRadius: 12,
-            background: 'transparent', color: C.muted,
-            border: `1.5px solid ${C.warm2}`,
-            fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            fontFamily: "'DM Sans', sans-serif",
+            flexShrink: 0, padding: '14px 20px', borderRadius: 14,
+            background: C.white, color: C.ink, border: C.borderThin,
+            fontSize: 14, fontWeight: 900, cursor: 'pointer',
+            fontFamily: "'DM Sans', sans-serif", boxShadow: C.shadowSm,
           }}
         >
-          {copied ? '✓' : '📋'}
+          {copied ? '✓ Copied' : '📋 Copy Text'}
         </motion.button>
       </div>
     </div>
